@@ -63,7 +63,7 @@ def molecule(name: str) -> Structure:
             position=np.array([[0.0, 0.0, 0.0], [1.4, 0.0, 0.0]]),
         )
 
-    if name == "water":
+    if name in ("water", "h2o"):
         r"""Single water molecule
         Structure of single water molecule calculated with DFT using B3LYP
         functional and 6-31+G** basis set <https://cccbdb.nist.gov/>"""
@@ -78,7 +78,7 @@ def molecule(name: str) -> Structure:
             ),
         )
 
-    if name == "benzene":
+    if name in ("benzene", "c6h6"):
         r"""Benzene ring C6H6
         Strucutre of benzene ring calculated with DFT using B3LYP
         functional and 6-31+G** basis set <https://cccbdb.nist.gov/>"""
@@ -102,7 +102,7 @@ def molecule(name: str) -> Structure:
             ),
         )
 
-    if name == "methane":
+    if name in ("methane", "ch4"):
         r"""Methane molecule CH4
         Structure of methane molecule calculated with DFT using B3LYP
         functional and 6-31+G** basis set <https://cccbdb.nist.gov/>"""

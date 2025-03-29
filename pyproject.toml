@@ -7,13 +7,12 @@ name = "mess-jax"
 authors = [{ name = "Hatem Helal", email = "hatem@valencelabs.com" }]
 description = "MESS: Modern Electronic Structure Simulations"
 readme = "README.md"
-license = { text = "MIT License" }
+license = "MIT"
 requires-python = ">=3.11"
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "Topic :: Scientific/Engineering",
-  "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
 ]
 dependencies = [
