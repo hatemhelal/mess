@@ -87,17 +87,6 @@ def benchmark_pyscf(
     }
 
 
-num_runs = 10
-basis_names = ["sto-3g", "6-31g"]
-structure = ["h2", "h2o", "ch4", "c6h6"]
-methods = ["hfx", "pbe"]
-results = []
-
-for basis, mol, xc in product(basis_names, structure, methods):
-    results.append(benchmark_mess(mol, basis, xc, num_runs))
-    results.append(benchmark_pyscf(mol, basis, xc, num_runs))
-
-
 def generate_filename(
     directory: str, base_name: str = "benchmarks", ext: str = ".parquet"
 ) -> str:
@@ -116,7 +105,18 @@ def generate_filename(
         counter += 1
 
 
-df = pd.DataFrame(results)
-output_path = generate_filename(osp.dirname(osp.abspath(__file__)))
-df.to_parquet(output_path, index=False)
-print(df)
+if __name__ == "__main__":
+    num_runs = 10
+    basis_names = ["sto-3g", "6-31g"]
+    structure = ["h2", "h2o", "ch4", "c6h6"]
+    methods = ["hfx", "pbe"]
+    results = []
+
+    for basis, mol, xc in product(basis_names, structure, methods):
+        results.append(benchmark_mess(mol, basis, xc, num_runs))
+        results.append(benchmark_pyscf(mol, basis, xc, num_runs))
+
+    df = pd.DataFrame(results)
+    output_path = generate_filename(osp.dirname(osp.abspath(__file__)))
+    df.to_parquet(output_path, index=False)
+    print(df)
