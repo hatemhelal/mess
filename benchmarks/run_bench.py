@@ -28,6 +28,9 @@ def benchmark_mess(
     mol = molecule(mol_name)
     basis = basisset(mol, basis_name)
     H = Hamiltonian(basis, xc_method=xc_method)
+    tic = perf_counter()
+    H = jax.device_put(H)
+    transfer_time = perf_counter() - tic
 
     tic = perf_counter()
     minimise.lower(H).compile()
@@ -41,6 +44,7 @@ def benchmark_mess(
     avg_time = (perf_counter() - tic) / num_runs
 
     return {
+        "transfer_time_s": transfer_time,
         "compilation_time_s": compilation_time,
         "average_runtime_s": avg_time,
         "num_runs": num_runs,
@@ -77,6 +81,7 @@ def benchmark_pyscf(
     avg_time = (perf_counter() - tic) / num_runs
 
     return {
+        "transfer_time_s": 0,
         "compilation_time_s": 0,
         "average_runtime_s": avg_time,
         "num_runs": num_runs,
@@ -88,20 +93,18 @@ def benchmark_pyscf(
 
 
 def generate_filename(
-    directory: str, base_name: str = "benchmarks", ext: str = ".parquet"
+    directory: str, base_name: str = "results", ext: str = ".parquet"
 ) -> str:
     """Generate a unique benchmark filename by appending an incrementing number."""
 
-    counter = 1
+    counter = 0
 
     while True:
-        if counter == 1:
-            new_path = osp.join(directory, f"{base_name}{ext}")
-        else:
-            new_path = osp.join(directory, f"{base_name}_{counter}{ext}")
+        new_path = osp.join(directory, f"{base_name}_{counter:03d}{ext}")
 
         if not osp.exists(new_path):
             return new_path
+
         counter += 1
 
 
