@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mess-jax"
-authors = [{ name = "Hatem Helal", email = "hatem@valencelabs.com" }]
+authors = [{ name = "Hatem Helal", email = "hatem.helal@gmail.com" }]
 description = "MESS: Modern Electronic Structure Simulations"
 readme = "README.md"
 license = { text = "MIT License" }
@@ -48,10 +48,10 @@ dev = [
 ]
 
 [project.urls]
-Website = "https://github.com/valence-labs/mess"
-"Source Code" = "https://github.com/valence-labs/mess"
-"Bug Tracker" = "https://github.com/valence-labs/mess/issues"
-Documentation = "https://valence-labs.github.io/mess/"
+Website = "https://github.com/hatemhelal/mess"
+"Source Code" = "https://github.com/hatemhelal/mess"
+"Bug Tracker" = "https://github.com/hatemhelal/mess/issues"
+Documentation = "https://hatemhelal.github.io/mess/"
 
 [tool.setuptools]
 include-package-data = true
