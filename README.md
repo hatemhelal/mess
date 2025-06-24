@@ -6,10 +6,10 @@
 > Expect bugs and surprising performance cliffs.\
 > :hammer: :skull: :warning: :wrench:
 
-[![docs](https://img.shields.io/badge/MESS-docs-blue?logo=bookstack)](https://valence-labs.github.io/mess)
+[![docs](https://img.shields.io/badge/MESS-docs-blue?logo=bookstack)](https://hatemhelal.github.io/mess)
 [![arXiv](https://img.shields.io/badge/arXiv-2406.03121-b31b1b.svg)](https://arxiv.org/abs/2406.03121)
-[![unit tests](https://github.com/valence-labs/mess/actions/workflows/unittest.yaml/badge.svg)](https://github.com/valence-labs/mess/actions/workflows/unittest.yaml)
-[![pre-commit checks](https://github.com/valence-labs/mess/actions/workflows/pre-commit.yaml/badge.svg)](https://github.com/valence-labs/mess/actions/workflows/pre-commit.yaml)
+[![unit tests](https://github.com/hatemhelal/mess/actions/workflows/unittest.yaml/badge.svg)](https://github.com/hatemhelal/mess/actions/workflows/unittest.yaml)
+[![pre-commit checks](https://github.com/hatemhelal/mess/actions/workflows/pre-commit.yaml/badge.svg)](https://github.com/hatemhelal/mess/actions/workflows/pre-commit.yaml)
 
 ## Motivation
 
@@ -43,10 +43,10 @@ our understanding of molecular scale processes.
 ## Installing
 
 We recommend installing directly from the main branch from github and sharing any
-feedback as [issues](https://github.com/valence-labs/mess/issues).
+feedback as [issues](https://github.com/hatemhelal/mess/issues).
 
 ```
-pip install git+https://github.com/valence-labs/mess.git
+pip install git+https://github.com/hatemhelal/mess.git
 ```
 
 Requires Python 3.11+ and we recommend [installing JAX](https://jax.readthedocs.io/en/latest/installation.html) for your target system (e.g. CPU, GPU, etc).

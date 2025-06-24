@@ -19,7 +19,7 @@ class Primitive(eqx.Module):
 
     def __post_init__(self):
         if self.norm is None:
-            self.norm = normalize(self.lmn, self.alpha)
+            self.norm = normalize(asintarray(self.lmn), self.alpha)
 
     def __check_init__(self):
         names = ["center", "alpha", "lmn", "norm"]

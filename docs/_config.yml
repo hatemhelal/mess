@@ -31,7 +31,7 @@ bibtex_bibfiles:
 
 # Information about where the book exists on the web
 repository:
-  url: https://github.com/valence-labs/mess
+  url: https://github.com/hatemhelal/mess
   path_to_book: docs
   branch: main
 
@@ -61,7 +61,7 @@ sphinx:
     html_theme: sphinx_book_theme
     html_theme_options:
       navigation_with_keys: False
-      repository_url: https://github.com/valence-labs/mess
+      repository_url: https://github.com/hatemhelal/mess
       repository_branch: main
       path_to_docs: docs
       launch_buttons:
