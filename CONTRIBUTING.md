@@ -6,28 +6,25 @@ bugs encountered, or enhancement requests as
 
 ## Setting up a development environment
 
-The following assumes that you have already set up an install of conda and that the
-conda command is available on your system path. Refer to your preferred conda installer:
+The following assumes that you have already set up an install of [uv](https://docs.astral.sh/uv/) and that the
+`uv` command is available on your system path. Refer to the [uv install instructions](https://docs.astral.sh/uv/#installation) for your platform.
 
-- [miniforge installation](https://github.com/conda-forge/miniforge#install)
-- [conda installation documentation](https://docs.conda.io/projects/conda/en/latest/user-guide/install/index.html).
-
-1. Create a new conda environment with the minimum python version required:
+1. Create a virtual environment with the minimum python version required:
 
    ```bash
-   conda create -n mess python=3.11
+   uv venv --python=3.11
    ```
 
 1. Install all required packages for developing MESS:
 
    ```bash
-   pip install -e .[dev]
+   uv pip install -e .[dev]
    ```
 
 1. Install the pre-commit hooks
 
    ```bash
-   pre-commit install
+   uv run pre-commit install
    ```
 
 1. Create a feature branch, make changes, and when you commit them the pre-commit hooks
@@ -46,7 +43,7 @@ conda command is available on your system path. Refer to your preferred conda in
 Run all the tests using `pytest`
 
 ```bash
-pytest
+uv run pytest
 ```
 
 ## Building Documentation
@@ -54,5 +51,5 @@ pytest
 From the project root, you can build the documentation with:
 
 ```bash
-jupyter-book build docs
+uv run jupyter-book build docs
 ```
