@@ -118,7 +118,7 @@ def basisset(structure: Structure, basis_name: str = "sto-3g") -> Basis:
     center = structure.position[primitives.atom_index, :]
     primitives = eqx.tree_at(lambda p: p.center, primitives, center)
 
-    return Basis(
+    basis = Basis(
         orbitals=orbitals,
         structure=structure,
         primitives=primitives,
@@ -127,6 +127,11 @@ def basisset(structure: Structure, basis_name: str = "sto-3g") -> Basis:
         basis_name=basis_name,
         max_L=int(np.max(primitives.lmn)),
     )
+
+    # TODO(hh): this introduces some performance overhead into basis construction that
+    # could be pushed down into the cached orbitals.
+    basis = renorm(basis)
+    return basis
 
 
 @cache
@@ -194,3 +199,12 @@ def basis_iter(basis: Basis):
     lhs, cl = take_primitives(ii.reshape(-1))
     rhs, cr = take_primitives(jj.reshape(-1))
     return (ii, cl, lhs), (jj, cr, rhs)
+
+
+def renorm(basis: Basis) -> Basis:
+    from mess.integrals import overlap_basis
+
+    S = overlap_basis(basis)
+    n = 1 / jnp.sqrt(jnp.diag(S))
+    C = n[basis.orbital_index] * basis.coefficients
+    return eqx.tree_at(lambda b: b.coefficients, basis, C)

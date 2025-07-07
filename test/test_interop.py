@@ -6,7 +6,7 @@ from numpy.testing import assert_allclose
 from mess.basis import basisset
 from mess.interop import to_pyscf
 from mess.mesh import density, density_and_grad, uniform_mesh
-from mess.structure import molecule, nuclear_energy
+from mess.structure import molecule, nuclear_energy, Structure
 
 
 @pytest.mark.parametrize("basis_name", ["sto-3g", "6-31g**"])
@@ -17,15 +17,15 @@ def test_to_pyscf(basis_name):
     assert basis.num_orbitals == pyscf_mol.nao
 
 
-def test_gto():
+@pytest.mark.parametrize("basis_name", ["6-31+g", "def2-SVP"])
+def test_gto(basis_name):
     from pyscf.dft.numint import eval_rho, eval_ao
     from jax.experimental import enable_x64
 
     with enable_x64(True):
         # Run these comparisons to PySCF in fp64
         # Atomic orbitals
-        basis_name = "6-31+g"
-        structure = molecule("water")
+        structure = Structure(np.asarray(2), np.zeros(3))
         basis = basisset(structure, basis_name)
         mesh = uniform_mesh()
         actual = basis(mesh.points)
