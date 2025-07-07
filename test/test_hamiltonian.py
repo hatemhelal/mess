@@ -19,11 +19,11 @@ cases = {
 
 
 @pytest.mark.parametrize("inputs", cases.items(), ids=cases.keys())
-def test_energy(inputs):
+@pytest.mark.parametrize("basis_name", ["6-31g", "def2-SVP"])
+def test_energy(inputs, basis_name):
     with enable_x64(True):
         xc_method, scfxc = inputs
         mol = Structure(np.asarray(2), np.zeros(3))
-        basis_name = "6-31g"
         basis = basisset(mol, basis_name)
         scfmol = to_pyscf(mol, basis_name=basis_name)
         s = dft.RKS(scfmol, xc=scfxc)
