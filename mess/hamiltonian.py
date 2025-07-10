@@ -1,6 +1,6 @@
 """Many electron Hamiltonian with Density Functional Theory or Hartree-Fock."""
 
-from typing import Literal, Optional, Tuple, get_args
+from typing import Callable, Literal, Optional, Tuple, get_args
 from functools import partial
 
 import equinox as eqx
@@ -245,11 +245,16 @@ class Hamiltonian(eqx.Module):
         return C
 
 
+def identity_guess(basis: Basis) -> FloatNxN:
+    return jnp.eye(basis.num_orbitals)
+
+
 @partial(jax.jit, static_argnames=("max_steps"))
 def minimise(
     H: Hamiltonian,
     max_steps: Optional[int] = None,
     solver: optx.AbstractMinimiser = optx.BFGS(atol=1e-6, rtol=1e-5),
+    initial_guess_fn: Callable[[Basis], FloatNxN] = identity_guess,
 ) -> Tuple[ScalarLike, FloatNxN, optx.Solution]:
     """Solve for the electronic coefficients that minimise the total energy
 
@@ -262,6 +267,9 @@ def minimise(
         max_steps (Optional[int]): Maximum number of minimizer steps. Defaults to None.
         solver (optimistix.AbstractMinimizer): Solver instance to use to minimise the
             electronic energy. Defaults to BFGS.
+        initial_guess_fn (Callable[[Basis], FloatNxN]): A function that provides an
+            initial guess for the optimization matrix. This is then orthonormalized to
+            form the molecular orbital coefficients. Defaults to `identity_guess`.
 
     Returns:
         Tuple[ScalarLike, FloatNxN, optimistix.Solution]: A tuple containing:
@@ -276,7 +284,7 @@ def minimise(
         return H(P)
 
     solver = optx.BestSoFarMinimiser(solver)
-    Z = jnp.eye(H.basis.num_orbitals)
+    Z = initial_guess_fn(H.basis)
     sol = optx.minimise(f, solver, Z, max_steps=max_steps)
     C = H.orthonormalise(sol.value)
     P = H.basis.density_matrix(C)
