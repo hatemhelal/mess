@@ -9,6 +9,12 @@ from mess.mesh import density, density_and_grad, uniform_mesh
 from mess.structure import molecule, nuclear_energy, Structure
 
 
+mol_cases = {
+    "water": molecule("water"),
+    "He": Structure(np.asarray(2), np.zeros(3)),
+}
+
+
 @pytest.mark.parametrize("basis_name", ["sto-3g", "6-31g**"])
 def test_to_pyscf(basis_name):
     mol = molecule("water")
@@ -18,19 +24,19 @@ def test_to_pyscf(basis_name):
 
 
 @pytest.mark.parametrize("basis_name", ["6-31+g", "def2-SVP"])
-def test_gto(basis_name):
+@pytest.mark.parametrize("mol", mol_cases.values(), ids=mol_cases.keys())
+def test_gto(basis_name, mol):
     from pyscf.dft.numint import eval_rho, eval_ao
     from jax.experimental import enable_x64
 
     with enable_x64(True):
         # Run these comparisons to PySCF in fp64
         # Atomic orbitals
-        structure = Structure(np.asarray(2), np.zeros(3))
-        basis = basisset(structure, basis_name)
+        basis = basisset(mol, basis_name)
         mesh = uniform_mesh()
         actual = basis(mesh.points)
 
-        mol = to_pyscf(structure, basis_name)
+        mol = to_pyscf(mol, basis_name)
         expect_ao = eval_ao(mol, np.asarray(mesh.points))
         assert_allclose(actual, expect_ao, atol=1e-7)
 
