@@ -7,7 +7,7 @@ from pyscf import dft
 from mess.basis import basisset
 from mess.hamiltonian import Hamiltonian
 from mess.interop import to_pyscf
-from mess.structure import Structure, molecule
+from mess.structure import Structure, molecule, nuclear_energy
 
 cases = {
     "hfx": "hf,",
@@ -37,6 +37,6 @@ def test_energy(inputs, basis_name, mol):
         P = np.asarray(s.make_rdm1())
 
         H = Hamiltonian(basis=basis, xc_method=xc_method)
-        actual = H(P)
+        actual = H(P) + nuclear_energy(mol)
         expect = s.energy_tot()
         assert_allclose(actual, expect, atol=1e-6)
