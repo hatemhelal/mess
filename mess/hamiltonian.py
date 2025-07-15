@@ -228,7 +228,7 @@ class Hamiltonian(eqx.Module):
         self.X = ont(S)
         self.H_core = one_elec.kinetic + one_elec.nuclear
         self.two_electron = TwoElectron(basis, backend=backend)
-        self.xcfunc = build_xcfunc(xc_method, basis, self.two_electron)
+        self.xcfunc = build_xcfunc(xc_method, self.basis, self.two_electron)
 
     def __call__(self, P: FloatNxN) -> ScalarLike:
         E_core = jnp.sum(self.H_core * P)
