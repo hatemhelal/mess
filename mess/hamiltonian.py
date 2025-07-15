@@ -10,7 +10,7 @@ import jax.numpy.linalg as jnl
 import optimistix as optx
 from jaxtyping import Array, ScalarLike
 
-from mess.basis import Basis
+from mess.basis import Basis, renorm
 from mess.integrals import eri_basis, kinetic_basis, nuclear_basis, overlap_basis
 from mess.interop import to_pyscf
 from mess.mesh import Mesh, density, density_and_grad, xcmesh_from_pyscf
@@ -56,9 +56,7 @@ class OneElectron(eqx.Module):
         elif backend.startswith("pyscf_"):
             mol = to_pyscf(basis.structure, basis.basis_name)
             kind = backend.split("_")[1]
-            S = jnp.array(mol.intor(f"int1e_ovlp_{kind}"))
-            N = 1 / jnp.sqrt(jnp.diagonal(S))
-            self.overlap = N[:, jnp.newaxis] * N[jnp.newaxis, :] * S
+            self.overlap = jnp.array(mol.intor(f"int1e_ovlp_{kind}"))
             self.kinetic = jnp.array(mol.intor(f"int1e_kin_{kind}"))
             self.nuclear = jnp.array(mol.intor(f"int1e_nuc_{kind}"))
 
@@ -224,7 +222,7 @@ class Hamiltonian(eqx.Module):
         backend: IntegralBackend = "pyscf_cart",
     ):
         super().__init__()
-        self.basis = basis
+        self.basis = renorm(basis, backend) if backend != "mess" else basis
         one_elec = OneElectron(basis, backend=backend)
         S = one_elec.overlap
         self.X = ont(S)

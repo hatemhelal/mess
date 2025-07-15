@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from mess.basis import basisset
+from mess.basis import basisset, renorm
 from mess.integrals import (
     eri_basis,
     eri_basis_sparse,
@@ -35,13 +35,11 @@ def test_overlap():
 @pytest.mark.parametrize("basis_name", ["sto-3g", "6-31+g", "6-31+g*"])
 def test_water_overlap(basis_name):
     basis = basisset(molecule("water"), basis_name)
+    basis = renorm(basis, mode="pyscf_cart")
     actual_overlap = overlap_basis(basis)
 
-    # Note: PySCF doesn't appear to normalise d basis functions in cartesian basis
     scfmol = to_pyscf(molecule("water"), basis_name=basis_name)
     expect_overlap = scfmol.intor("int1e_ovlp_cart")
-    n = 1 / np.sqrt(np.diagonal(expect_overlap))
-    expect_overlap = n[:, None] * n[None, :] * expect_overlap
     assert_allclose(actual_overlap, expect_overlap, atol=1e-5)
 
 
@@ -60,22 +58,14 @@ def test_kinetic():
     assert_allclose(actual, expect, atol=1e-4)
 
 
-@pytest.mark.parametrize(
-    "basis_name",
-    [
-        "sto-3g",
-        "6-31+g",
-        pytest.param(
-            "6-31+g*", marks=pytest.mark.xfail(reason="Cartesian norm problem?")
-        ),
-    ],
-)
+@pytest.mark.parametrize("basis_name", ["sto-3g", "6-31+g", "6-31+g*"])
 def test_water_kinetic(basis_name):
     basis = basisset(molecule("water"), basis_name)
+    basis = renorm(basis, mode="pyscf_cart")
     actual = kinetic_basis(basis)
 
     expect = to_pyscf(molecule("water"), basis_name=basis_name).intor("int1e_kin_cart")
-    assert_allclose(actual, expect, atol=1e-4)
+    assert_allclose(actual, expect, atol=1e-5)
 
 
 def test_nuclear():

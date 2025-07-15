@@ -1,7 +1,7 @@
 """basis sets of Gaussian type orbitals"""
 
 from functools import cache
-from typing import Tuple
+from typing import Literal, Tuple, get_args
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -201,10 +201,43 @@ def basis_iter(basis: Basis):
     return (ii, cl, lhs), (jj, cr, rhs)
 
 
-def renorm(basis: Basis) -> Basis:
-    from mess.integrals import overlap_basis
+RenormMode = Literal["orthonormal", "pyscf_cart", "pyscf_sph"]
 
-    S = overlap_basis(basis)
-    n = 1 / jnp.sqrt(jnp.diag(S))
+
+def renorm(basis: Basis, mode: RenormMode = "orthonormal") -> Basis:
+    """Renormalise the basis set.
+
+    Args:
+        basis (Basis): The basis set to renormalise.
+        mode (str, optional): The normalisation mode. Can be "orthonormal" to
+            normalise such that the self-overlap integral is 1, or either "pyscf_cart"
+            or "pyscf_sph" to normalise according to PySCF's convention.
+            Defaults to "orthonormal".
+
+    Raises:
+        ValueError: If an unknown normalisation mode is provided.
+
+    Returns:
+        Basis: The renormalised basis set.
+    """
+    match mode:
+        case "orthonormal":
+            from mess.integrals import overlap_basis
+
+            S = overlap_basis(basis)
+            n = 1 / jnp.sqrt(jnp.diag(S))
+        case "pyscf_cart" | "pyscf_sph":
+            from mess.interop import to_pyscf
+
+            mol = to_pyscf(basis.structure, basis.basis_name)
+            kind = mode.split("_")[1]
+            n = np.sqrt(np.diag(mol.intor(f"int1e_ovlp_{kind}")))
+        case _:
+            modes = get_args(RenormMode)
+            modes = ", ".join(modes)
+            msg = f"Unknown renorm mode: {mode}"
+            msg += f"\nMust be one of the following: {modes}"
+            raise ValueError(msg)
+
     C = n[basis.orbital_index] * basis.coefficients
     return eqx.tree_at(lambda b: b.coefficients, basis, C)

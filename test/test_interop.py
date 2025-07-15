@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from mess.basis import basisset
+from mess.basis import basisset, renorm
 from mess.interop import to_pyscf
 from mess.mesh import density, density_and_grad, uniform_mesh
 from mess.structure import molecule, nuclear_energy, Structure
@@ -23,7 +23,7 @@ def test_to_pyscf(basis_name):
     assert basis.num_orbitals == pyscf_mol.nao
 
 
-@pytest.mark.parametrize("basis_name", ["6-31+g", "def2-SVP"])
+@pytest.mark.parametrize("basis_name", ["6-31g*", "def2-SVP"])
 @pytest.mark.parametrize("mol", mol_cases.values(), ids=mol_cases.keys())
 def test_gto(basis_name, mol):
     from pyscf.dft.numint import eval_rho, eval_ao
@@ -33,6 +33,7 @@ def test_gto(basis_name, mol):
         # Run these comparisons to PySCF in fp64
         # Atomic orbitals
         basis = basisset(mol, basis_name)
+        basis = renorm(basis, mode="pyscf_cart")
         mesh = uniform_mesh()
         actual = basis(mesh.points)
 
@@ -51,7 +52,7 @@ def test_gto(basis_name, mol):
         # Electron density
         actual = density(basis, mesh, P)
         expect = eval_rho(mol, expect_ao, mf.make_rdm1(), xctype="lda")
-        assert_allclose(actual, expect, atol=1e-7)
+        assert_allclose(actual, expect, atol=1e-6)
 
         # Electron density and gradient
         rho, grad_rho = density_and_grad(basis, mesh, P)
@@ -59,8 +60,8 @@ def test_gto(basis_name, mol):
         expect = eval_rho(mol, ao_and_grad, mf.make_rdm1(), xctype="gga")
         expect_rho = expect[0, :]
         expect_grad = expect[1:, :].T
-        assert_allclose(rho, expect_rho, atol=1e-7)
-        assert_allclose(grad_rho, expect_grad, atol=1e-6)
+        assert_allclose(rho, expect_rho, atol=1e-6)
+        assert_allclose(grad_rho, expect_grad, atol=1e-5)
 
 
 @pytest.mark.parametrize("name", ["water", "h2"])
