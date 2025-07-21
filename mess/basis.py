@@ -146,6 +146,18 @@ LMN_MAP = {
 # fmt: on
 
 
+# Mapping from L to Cartesian lmn angular momentum quantum numbers
+# fmt: off
+LMN_MAP = {
+    0: [(0, 0, 0)],
+    1: [(1, 0, 0), (0, 1, 0), (0, 0, 1)],
+    2: [(2, 0, 0), (1, 1, 0), (1, 0, 1), (0, 2, 0), (0, 1, 1), (0, 0, 2)],
+    3: [(3, 0, 0), (2, 1, 0), (2, 0, 1), (1, 2, 0), (1, 1, 1),
+        (1, 0, 2), (0, 3, 0), (0, 2, 1), (0, 1, 2), (0, 0, 3)],
+}
+# fmt: on
+
+
 @cache
 def _bse_to_orbitals(basis_name: str, atomic_number: int) -> Tuple[Orbital]:
     """
@@ -245,7 +257,7 @@ def renorm(basis: Basis, mode: RenormMode = "orthonormal") -> Basis:
     return eqx.tree_at(lambda b: b.coefficients, basis, C)
 
 
-def cart2sph_coef(lmn: tuple[int, int, int], l: int, m: int) -> complex:
+def c_cart2sph(lmn: tuple[int, int, int], l: int, m: int) -> complex:
     """Transformation coefficients for Cartesian to spherical Gaussian coefficients.
 
     This function calculates the transformation coefficient from a Cartesian Gaussian
@@ -288,7 +300,11 @@ def cart2sph_coef(lmn: tuple[int, int, int], l: int, m: int) -> complex:
     iterm_num = binom(l, i) * binom(i, j) * (-1) ** i * factorial(2 * l - 2 * i)
     out *= np.sum(iterm_num / factorial(l - abs_m - 2 * i))
 
-    k = np.arange(0, j + 1)
+    # sum_k taking into account that binom(p, q) is zero for q < 0 and q > p
+    ki = np.maximum((lmn[0] - abs_m // 2), 0)
+    kf = np.minimum(j, lmn[0] // 2)
+    k = np.arange(ki, kf + 1)
+
     if len(k) > 0:
         kterm = binom(j, k) * binom(abs_m, lmn[0] - 2 * k)
         power = np.sign(m) * 0.5 * (abs_m - lmn[0] + 2 * k)
@@ -298,7 +314,7 @@ def cart2sph_coef(lmn: tuple[int, int, int], l: int, m: int) -> complex:
 
 
 @cache
-def cart2sph_complex(l: int) -> np.ndarray:
+def transform_cart2sph(l: int) -> np.ndarray:
     """Transformation matrix for Cartesian to spherical Gaussian coefficients.
 
     This function generates a transformation matrix that converts Cartesian Gaussian
@@ -319,7 +335,7 @@ def cart2sph_complex(l: int) -> np.ndarray:
     for lmn in LMN_MAP[l]:
         row = []
         for m in range(-l, l + 1):
-            row.append(cart2sph_coef(lmn, l, m))
+            row.append(c_cart2sph(lmn, l, m))
 
         out.append(row)
 
