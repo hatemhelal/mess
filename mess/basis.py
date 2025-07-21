@@ -134,6 +134,18 @@ def basisset(structure: Structure, basis_name: str = "sto-3g") -> Basis:
     return basis
 
 
+# Mapping from L to Cartesian lmn angular momentum quantum numbers
+# fmt: off
+LMN_MAP = {
+    0: [(0, 0, 0)],
+    1: [(1, 0, 0), (0, 1, 0), (0, 0, 1)],
+    2: [(2, 0, 0), (1, 1, 0), (1, 0, 1), (0, 2, 0), (0, 1, 1), (0, 0, 2)],
+    3: [(3, 0, 0), (2, 1, 0), (2, 0, 1), (1, 2, 0), (1, 1, 1),
+        (1, 0, 2), (0, 3, 0), (0, 2, 1), (0, 1, 2), (0, 0, 3)],
+}
+# fmt: on
+
+
 @cache
 def _bse_to_orbitals(basis_name: str, atomic_number: int) -> Tuple[Orbital]:
     """
@@ -152,16 +164,6 @@ def _bse_to_orbitals(basis_name: str, atomic_number: int) -> Tuple[Orbital]:
     """
     from basis_set_exchange import get_basis
     from basis_set_exchange.sort import sort_basis
-
-    # fmt: off
-    LMN_MAP = {
-        0: [(0, 0, 0)],
-        1: [(1, 0, 0), (0, 1, 0), (0, 0, 1)],
-        2: [(2, 0, 0), (1, 1, 0), (1, 0, 1), (0, 2, 0), (0, 1, 1), (0, 0, 2)],
-        3: [(3, 0, 0), (2, 1, 0), (2, 0, 1), (1, 2, 0), (1, 1, 1),
-            (1, 0, 2), (0, 3, 0), (0, 2, 1), (0, 1, 2), (0, 0, 3)],
-    }
-    # fmt: on
 
     bse_basis = get_basis(
         basis_name,
@@ -241,3 +243,88 @@ def renorm(basis: Basis, mode: RenormMode = "orthonormal") -> Basis:
 
     C = n[basis.orbital_index] * basis.coefficients
     return eqx.tree_at(lambda b: b.coefficients, basis, C)
+
+
+def c_cart2sph(lmn: tuple[int, int, int], l: int, m: int) -> complex:
+    """Transformation coefficients for Cartesian to spherical Gaussian coefficients.
+
+    This function calculates the transformation coefficient from a Cartesian Gaussian
+    function (defined by `lmn`) to a spherical Gaussian function (defined by `l` and
+    `m`). The formula used is based on the relationship between Cartesian and spherical
+    harmonics. See equation 15 of <https://doi.org/10.1002/qua.560540202>.
+
+
+    Args:
+        lmn (tuple): A tuple (lx, ly, lz) representing the angular momentum
+                     components of the Cartesian Gaussian function.
+        l (int): The total angular momentum quantum number of the spherical harmonic.
+        m (int): The magnetic quantum number of the spherical harmonic.
+
+    Returns:
+        complex: The transformation coefficient as a complex scalar
+    """
+    from scipy.special import binom, factorial
+
+    lmn, l, m = np.array(lmn), np.array(l), np.array(m)
+
+    # Check if j = (lx + ly - |m|) / 2 is an integer
+    abs_m = np.abs(m)
+    j = lmn[0] + lmn[1] - abs_m
+
+    if j % 2 != 0:
+        # j must be half-integral so coefficient must be zero
+        return np.array(0.0, dtype=complex)
+    else:
+        j = j // 2
+
+    # constant pre-factor
+    num = np.prod(factorial(2 * lmn)) * factorial(l) * factorial(l - abs_m)
+    dem = factorial(2 * l) * np.prod(factorial(lmn)) * factorial(l + abs_m)
+    out = np.sqrt(num / dem) / (2**l * factorial(l))
+
+    # sum_i taking into account that binom(p, q) is zero for q < 0 and q > p
+    # as well as avoiding negative factorial in the denominator
+    i = np.arange(np.maximum(j, 0), (l - abs_m) // 2 + 1)
+    iterm_num = binom(l, i) * binom(i, j) * (-1) ** i * factorial(2 * l - 2 * i)
+    out *= np.sum(iterm_num / factorial(l - abs_m - 2 * i))
+
+    # sum_k taking into account that binom(p, q) is zero for q < 0 and q > p
+    ki = np.maximum((lmn[0] - abs_m // 2), 0)
+    kf = np.minimum(j, lmn[0] // 2)
+    k = np.arange(ki, kf + 1)
+
+    if len(k) > 0:
+        kterm = binom(j, k) * binom(abs_m, lmn[0] - 2 * k)
+        power = np.sign(m) * 0.5 * (abs_m - lmn[0] + 2 * k)
+        out *= np.sum(kterm * np.power(-1.0, power, dtype=complex))
+
+    return out.astype(complex)
+
+
+@cache
+def transform_cart2sph(l: int) -> np.ndarray:
+    """Transformation matrix for Cartesian to spherical Gaussian coefficients.
+
+    This function generates a transformation matrix that converts Cartesian Gaussian
+    coefficients to spherical Gaussian coefficients for a given total angular momentum
+    `l`. Each row of the matrix corresponds to a Cartesian basis function (defined by
+    `lmn` from `LMN_MAP[l]`), and each column corresponds to a spherical basis function
+    (defined by `m` from `-l` to `l`).
+
+    Args:
+        l (int): The total angular momentum quantum number.
+
+    Returns:
+        np.ndarray: A 2D NumPy array representing the transformation matrix.
+                    The shape of the matrix is `(num_cartesian_functions, 2*l + 1)`.
+    """
+
+    out = []
+    for lmn in LMN_MAP[l]:
+        row = []
+        for m in range(-l, l + 1):
+            row.append(c_cart2sph(lmn, l, m))
+
+        out.append(row)
+
+    return np.asarray(out)
