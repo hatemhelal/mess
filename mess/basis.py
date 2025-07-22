@@ -257,7 +257,7 @@ def renorm(basis: Basis, mode: RenormMode = "orthonormal") -> Basis:
     return eqx.tree_at(lambda b: b.coefficients, basis, C)
 
 
-def c_cart2sph(lmn: tuple[int, int, int], l: int, m: int) -> complex:
+def cart2sph_coef(lmn: tuple[int, int, int], l: int, m: int) -> complex:
     """Transformation coefficients for Cartesian to spherical Gaussian coefficients.
 
     This function calculates the transformation coefficient from a Cartesian Gaussian
@@ -300,11 +300,7 @@ def c_cart2sph(lmn: tuple[int, int, int], l: int, m: int) -> complex:
     iterm_num = binom(l, i) * binom(i, j) * (-1) ** i * factorial(2 * l - 2 * i)
     out *= np.sum(iterm_num / factorial(l - abs_m - 2 * i))
 
-    # sum_k taking into account that binom(p, q) is zero for q < 0 and q > p
-    ki = np.maximum((lmn[0] - abs_m // 2), 0)
-    kf = np.minimum(j, lmn[0] // 2)
-    k = np.arange(ki, kf + 1)
-
+    k = np.arange(0, j + 1)
     if len(k) > 0:
         kterm = binom(j, k) * binom(abs_m, lmn[0] - 2 * k)
         power = np.sign(m) * 0.5 * (abs_m - lmn[0] + 2 * k)
@@ -314,7 +310,7 @@ def c_cart2sph(lmn: tuple[int, int, int], l: int, m: int) -> complex:
 
 
 @cache
-def transform_cart2sph(l: int) -> np.ndarray:
+def cart2sph_complex(l: int) -> np.ndarray:
     """Transformation matrix for Cartesian to spherical Gaussian coefficients.
 
     This function generates a transformation matrix that converts Cartesian Gaussian
@@ -335,7 +331,7 @@ def transform_cart2sph(l: int) -> np.ndarray:
     for lmn in LMN_MAP[l]:
         row = []
         for m in range(-l, l + 1):
-            row.append(c_cart2sph(lmn, l, m))
+            row.append(cart2sph_coef(lmn, l, m))
 
         out.append(row)
 
