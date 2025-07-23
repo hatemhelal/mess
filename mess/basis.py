@@ -147,18 +147,6 @@ LMN_MAP = {
 # fmt: on
 
 
-# Mapping from L to Cartesian lmn angular momentum quantum numbers
-# fmt: off
-LMN_MAP = {
-    0: [(0, 0, 0)],
-    1: [(1, 0, 0), (0, 1, 0), (0, 0, 1)],
-    2: [(2, 0, 0), (1, 1, 0), (1, 0, 1), (0, 2, 0), (0, 1, 1), (0, 0, 2)],
-    3: [(3, 0, 0), (2, 1, 0), (2, 0, 1), (1, 2, 0), (1, 1, 1),
-        (1, 0, 2), (0, 3, 0), (0, 2, 1), (0, 1, 2), (0, 0, 3)],
-}
-# fmt: on
-
-
 @cache
 def _bse_to_orbitals(basis_name: str, atomic_number: int) -> Tuple[Orbital]:
     """
@@ -259,7 +247,7 @@ def renorm(basis: Basis, mode: RenormMode = "orthonormal") -> Basis:
 
 
 def cart2sph_coef(lmn: tuple[int, int, int], l: int, m: int) -> complex:
-    """Transformation coefficients for Cartesian to spherical Gaussian coefficients.
+    """Transformation coefficients for Cartesian to spherical Gaussian basis functions.
 
     This function calculates the transformation coefficient from a Cartesian Gaussian
     function (defined by `lmn`) to a spherical Gaussian function (defined by `l` and
@@ -328,15 +316,9 @@ def cart2sph_complex(l: int) -> np.ndarray:
                     The shape of the matrix is `(num_cartesian_functions, 2*l + 1)`.
     """
 
-    out = []
-    for lmn in LMN_MAP[l]:
-        row = []
-        for m in range(-l, l + 1):
-            row.append(cart2sph_coef(lmn, l, m))
-
-        out.append(row)
-
-    return np.asarray(out)
+    return np.asarray([
+        [cart2sph_coef(lmn, l, m) for m in range(-l, l + 1)] for lmn in LMN_MAP[l]
+    ])
 
 
 @cache
@@ -358,16 +340,20 @@ def cart2sph_real(l: int) -> np.ndarray:
                     The shape of the matrix is `(num_cartesian_functions, 2*l + 1)`.
     """
 
-    T = deque()
+    out = deque()
     t0 = np.array([cart2sph_coef(lmn, l, 0) for lmn in LMN_MAP[l]]).real
-    T.append(t0)
+    out.append(t0)
 
     for m in range(1, l + 1):
         m_pos = np.array([cart2sph_coef(lmn, l, m) for lmn in LMN_MAP[l]])
         m_neg = np.array([cart2sph_coef(lmn, l, -m) for lmn in LMN_MAP[l]])
         plus = (m_neg + m_pos) / np.sqrt(2)
         minus = (m_neg - m_pos) * 1j / np.sqrt(2)
-        T.appendleft(np.real_if_close(minus))
-        T.append(np.real_if_close(plus))
+        out.appendleft(np.real_if_close(minus))
+        out.append(np.real_if_close(plus))
 
-    return np.array(T).T
+    # transpose so leading dim is in cartesian basis and clip small elements to zero
+    out = np.array(out).T
+    eps = np.finfo(out.dtype).eps
+    out[np.abs(out) < eps] = 0.0
+    return out
