@@ -1,5 +1,6 @@
 """basis sets of Gaussian type orbitals"""
 
+from collections import deque
 from functools import cache
 from typing import Literal, Tuple, get_args
 
@@ -336,3 +337,37 @@ def cart2sph_complex(l: int) -> np.ndarray:
         out.append(row)
 
     return np.asarray(out)
+
+
+@cache
+def cart2sph_real(l: int) -> np.ndarray:
+    """Transformation matrix for Cartesian to real spherical Gaussian coefficients.
+
+    This function generates a transformation matrix that converts Cartesian Gaussian
+    coefficients to real spherical Gaussian coefficients for a given total angular
+    momentum `l`. Each row of the matrix corresponds to a Cartesian basis function
+    (defined by `lmn` from `LMN_MAP[l]`), and each column corresponds to a real
+    spherical basis function (defined by `m` from `-l` to `l`, ordered as
+    -l, ..., -1, 0, 1, ..., l).
+
+    Args:
+        l (int): The total angular momentum quantum number.
+
+    Returns:
+        np.ndarray: A 2D NumPy array representing the transformation matrix.
+                    The shape of the matrix is `(num_cartesian_functions, 2*l + 1)`.
+    """
+
+    T = deque()
+    t0 = np.array([cart2sph_coef(lmn, l, 0) for lmn in LMN_MAP[l]]).real
+    T.append(t0)
+
+    for m in range(1, l + 1):
+        m_pos = np.array([cart2sph_coef(lmn, l, m) for lmn in LMN_MAP[l]])
+        m_neg = np.array([cart2sph_coef(lmn, l, -m) for lmn in LMN_MAP[l]])
+        plus = (m_neg + m_pos) / np.sqrt(2)
+        minus = (m_neg - m_pos) * 1j / np.sqrt(2)
+        T.appendleft(np.real_if_close(minus))
+        T.append(np.real_if_close(plus))
+
+    return np.array(T).T
