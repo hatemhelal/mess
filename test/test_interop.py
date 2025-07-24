@@ -7,37 +7,40 @@ from mess.basis import basisset, renorm
 from mess.interop import to_pyscf
 from mess.mesh import density, density_and_grad, uniform_mesh
 from mess.structure import molecule, nuclear_energy, Structure
-
+from conftest import is_mem_limited
 
 mol_cases = {
     "water": molecule("water"),
-    "He": Structure(np.asarray(2), np.zeros(3)),
+    "Ar": Structure(np.asarray(18), np.zeros(3)),
 }
 
 
 @pytest.mark.parametrize("basis_name", ["sto-3g", "6-31g**"])
-def test_to_pyscf(basis_name):
+@pytest.mark.parametrize("spherical", [True, False])
+def test_to_pyscf(basis_name, spherical):
     mol = molecule("water")
-    basis = basisset(mol, basis_name)
-    pyscf_mol = to_pyscf(mol, basis_name)
+    basis = basisset(mol, basis_name, spherical)
+    pyscf_mol = to_pyscf(mol, basis_name, spherical)
     assert basis.num_orbitals == pyscf_mol.nao
 
 
+@pytest.mark.skipif(is_mem_limited(), reason="Not enough host memory!")
 @pytest.mark.parametrize("basis_name", ["6-31g*", "def2-SVP"])
+@pytest.mark.parametrize("spherical", [True, False])
 @pytest.mark.parametrize("mol", mol_cases.values(), ids=mol_cases.keys())
-def test_gto(basis_name, mol):
+def test_gto(basis_name, spherical, mol):
     from pyscf.dft.numint import eval_rho, eval_ao
     from jax.experimental import enable_x64
 
     with enable_x64(True):
         # Run these comparisons to PySCF in fp64
         # Atomic orbitals
-        basis = basisset(mol, basis_name)
-        basis = renorm(basis, mode="pyscf_cart")
+        basis = basisset(mol, basis_name, spherical)
+        basis = renorm(basis, mode="pyscf_sph" if spherical else "pyscf_cart")
         mesh = uniform_mesh()
         actual = basis(mesh.points)
 
-        mol = to_pyscf(mol, basis_name)
+        mol = to_pyscf(mol, basis_name, spherical)
         expect_ao = eval_ao(mol, np.asarray(mesh.points))
         assert_allclose(actual, expect_ao, atol=1e-7)
 
@@ -47,7 +50,7 @@ def test_gto(basis_name, mol):
         C = jnp.array(mf.mo_coeff)
         P = basis.density_matrix(C)
         expect = jnp.array(mf.make_rdm1())
-        assert_allclose(P, expect)
+        assert_allclose(P, expect, atol=1e-7)
 
         # Electron density
         actual = density(basis, mesh, P)

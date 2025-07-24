@@ -19,6 +19,7 @@ FloatNxN = Float[Array, "N N"]
 FloatNxM = Float[Array, "N M"]
 Int3 = Int[Array, "3"]
 IntN = Int[Array, "N"]
+IntNx3 = Int[Array, "N 3"]
 
 MeshAxes = Tuple[FloatN, FloatN, FloatN]
 

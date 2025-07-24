@@ -219,7 +219,7 @@ class Hamiltonian(eqx.Module):
         basis: Basis,
         ont: OrthNormTransform = symmetric,
         xc_method: xcstr = "lda",
-        backend: IntegralBackend = "pyscf_cart",
+        backend: IntegralBackend = "pyscf_sph",
     ):
         super().__init__()
         self.basis = renorm(basis, backend) if backend != "mess" else basis
