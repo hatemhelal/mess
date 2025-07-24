@@ -16,28 +16,30 @@ mol_cases = {
 
 
 @pytest.mark.parametrize("basis_name", ["sto-3g", "6-31g**"])
-def test_to_pyscf(basis_name):
+@pytest.mark.parametrize("spherical", [True, False])
+def test_to_pyscf(basis_name, spherical):
     mol = molecule("water")
-    basis = basisset(mol, basis_name)
-    pyscf_mol = to_pyscf(mol, basis_name)
+    basis = basisset(mol, basis_name, spherical)
+    pyscf_mol = to_pyscf(mol, basis_name, spherical)
     assert basis.num_orbitals == pyscf_mol.nao
 
 
 @pytest.mark.parametrize("basis_name", ["6-31g*", "def2-SVP"])
+@pytest.mark.parametrize("spherical", [True, False])
 @pytest.mark.parametrize("mol", mol_cases.values(), ids=mol_cases.keys())
-def test_gto(basis_name, mol):
+def test_gto(basis_name, spherical, mol):
     from pyscf.dft.numint import eval_rho, eval_ao
     from jax.experimental import enable_x64
 
     with enable_x64(True):
         # Run these comparisons to PySCF in fp64
         # Atomic orbitals
-        basis = basisset(mol, basis_name)
-        basis = renorm(basis, mode="pyscf_cart")
+        basis = basisset(mol, basis_name, spherical)
+        basis = renorm(basis, mode="pyscf_sph" if spherical else "pyscf_cart")
         mesh = uniform_mesh()
         actual = basis(mesh.points)
 
-        mol = to_pyscf(mol, basis_name)
+        mol = to_pyscf(mol, basis_name, spherical)
         expect_ao = eval_ao(mol, np.asarray(mesh.points))
         assert_allclose(actual, expect_ao, atol=1e-7)
 
