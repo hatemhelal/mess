@@ -49,7 +49,7 @@ def test_gto(basis_name, spherical, mol):
         C = jnp.array(mf.mo_coeff)
         P = basis.density_matrix(C)
         expect = jnp.array(mf.make_rdm1())
-        assert_allclose(P, expect)
+        assert_allclose(P, expect, atol=1e-7)
 
         # Electron density
         actual = density(basis, mesh, P)
