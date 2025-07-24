@@ -11,7 +11,7 @@ from mess.structure import molecule, nuclear_energy, Structure
 
 mol_cases = {
     "water": molecule("water"),
-    "He": Structure(np.asarray(2), np.zeros(3)),
+    "Ar": Structure(np.asarray(18), np.zeros(3)),
 }
 
 

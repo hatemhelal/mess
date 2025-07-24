@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 
-from mess.basis import basisset, renorm
+from mess.basis import basisset
 from mess.integrals import (
     eri_basis,
     eri_basis_sparse,
@@ -35,11 +35,10 @@ def test_overlap():
 @pytest.mark.parametrize("basis_name", ["sto-3g", "6-31+g", "6-31+g*"])
 def test_water_overlap(basis_name):
     basis = basisset(molecule("water"), basis_name)
-    basis = renorm(basis, mode="pyscf_cart")
     actual_overlap = overlap_basis(basis)
 
     scfmol = to_pyscf(molecule("water"), basis_name=basis_name)
-    expect_overlap = scfmol.intor("int1e_ovlp_cart")
+    expect_overlap = scfmol.intor("int1e_ovlp_sph")
     assert_allclose(actual_overlap, expect_overlap, atol=1e-5)
 
 
@@ -61,10 +60,9 @@ def test_kinetic():
 @pytest.mark.parametrize("basis_name", ["sto-3g", "6-31+g", "6-31+g*"])
 def test_water_kinetic(basis_name):
     basis = basisset(molecule("water"), basis_name)
-    basis = renorm(basis, mode="pyscf_cart")
     actual = kinetic_basis(basis)
 
-    expect = to_pyscf(molecule("water"), basis_name=basis_name).intor("int1e_kin_cart")
+    expect = to_pyscf(molecule("water"), basis_name=basis_name).intor("int1e_kin_sph")
     assert_allclose(actual, expect, atol=1e-5)
 
 
@@ -92,7 +90,7 @@ def test_water_nuclear():
     h2o = molecule("water")
     basis = basisset(h2o, basis_name)
     actual = nuclear_basis(basis).sum(axis=0)
-    expect = to_pyscf(h2o, basis_name=basis_name).intor("int1e_nuc_cart")
+    expect = to_pyscf(h2o, basis_name=basis_name).intor("int1e_nuc_sph")
     assert_allclose(actual, expect, atol=1e-3)
 
 

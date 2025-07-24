@@ -13,7 +13,7 @@ from mess.package_utils import requires_package
 
 
 def to_pyscf(
-    structure: Structure, basis_name: str = "sto-3g", spherical: bool = False
+    structure: Structure, basis_name: str = "sto-3g", spherical: bool = True
 ) -> "gto.Mole":
     """Convert a MESS Structure to a PySCF Mole object.
 
@@ -22,7 +22,7 @@ def to_pyscf(
         basis_name (str, optional): The name of the basis set to use. Defaults to
             "sto-3g".
         spherical (bool, optional): Whether to use spherical Gaussian basis functions.
-            Defaults to False.
+            Defaults to ``True``.
 
     Returns:
         gto.Mole: The converted PySCF Mole object.

@@ -95,7 +95,7 @@ class Basis(eqx.Module):
 
 
 def basisset(
-    structure: Structure, basis_name: str = "sto-3g", spherical: bool = False
+    structure: Structure, basis_name: str = "sto-3g", spherical: bool = True
 ) -> Basis:
     """Factory function for building a basis set for a structure.
 
@@ -105,7 +105,7 @@ def basisset(
             `basis set exchange <https://www.basissetexchange.org/>`_.
             Defaults to ``sto-3g``.
         spherical (bool): flag to enable using spherical format Gaussian basis functions
-            as opposed to Cartesian format. Defaults to ``False``.
+            as opposed to Cartesian format. Defaults to ``True``.
 
     Returns:
         Basis constructed from inputs

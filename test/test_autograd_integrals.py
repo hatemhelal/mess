@@ -18,15 +18,15 @@ def test_nuclear_gradients():
     basis = basisset(h2, basis_name)
 
     actual = grad_overlap_basis(basis)
-    expect = scfmol.intor("int1e_ipovlp_cart", comp=3)
+    expect = scfmol.intor("int1e_ipovlp_sph", comp=3)
     assert_allclose(actual, expect, atol=1e-6)
 
     actual = grad_kinetic_basis(basis)
-    expect = scfmol.intor("int1e_ipkin_cart", comp=3)
+    expect = scfmol.intor("int1e_ipkin_sph", comp=3)
     assert_allclose(actual, expect, atol=1e-6)
 
     # TODO: investigate possible inconsistency in libcint outputs?
     actual = grad_nuclear_basis(basis)
-    expect = scfmol.intor("int1e_ipnuc_cart", comp=3)
+    expect = scfmol.intor("int1e_ipnuc_sph", comp=3)
     expect = -np.moveaxis(expect, 1, 2)
     assert_allclose(actual, expect, atol=1e-5)
