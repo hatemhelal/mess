@@ -1,6 +1,5 @@
 """basis sets of Gaussian type orbitals"""
 
-from collections import deque
 from functools import cache
 from typing import Literal, Tuple, get_args
 
@@ -13,6 +12,7 @@ from jax.ops import segment_sum
 
 from mess.orbital import Orbital, batch_orbitals
 from mess.primitive import Primitive
+from mess.shell import make_shell
 from mess.structure import Structure
 from mess.types import (
     FloatN,
@@ -32,6 +32,7 @@ class Basis(eqx.Module):
     orbital_index: IntN
     basis_name: str = eqx.field(static=True)
     max_L: int = eqx.field(static=True)
+    spherical: bool = eqx.field(static=True)
 
     @property
     def num_orbitals(self) -> int:
@@ -93,7 +94,9 @@ class Basis(eqx.Module):
         return hash(self.primitives)
 
 
-def basisset(structure: Structure, basis_name: str = "sto-3g") -> Basis:
+def basisset(
+    structure: Structure, basis_name: str = "sto-3g", spherical: bool = False
+) -> Basis:
     """Factory function for building a basis set for a structure.
 
     Args:
@@ -101,6 +104,8 @@ def basisset(structure: Structure, basis_name: str = "sto-3g") -> Basis:
         basis_name (str, optional): Basis set name to look up on the
             `basis set exchange <https://www.basissetexchange.org/>`_.
             Defaults to ``sto-3g``.
+        spherical (bool): flag to enable using spherical format Gaussian basis functions
+            as opposed to Cartesian format. Defaults to ``False``.
 
     Returns:
         Basis constructed from inputs
@@ -110,7 +115,7 @@ def basisset(structure: Structure, basis_name: str = "sto-3g") -> Basis:
 
     for atom_id in range(structure.num_atoms):
         element = int(structure.atomic_number[atom_id])
-        out = _bse_to_orbitals(basis_name, element)
+        out = _bse_to_orbitals(basis_name, element, spherical)
         atom_index.extend([atom_id] * sum(len(ao.primitives) for ao in out))
         orbitals += out
 
@@ -127,6 +132,7 @@ def basisset(structure: Structure, basis_name: str = "sto-3g") -> Basis:
         orbital_index=orbital_index,
         basis_name=basis_name,
         max_L=int(np.max(primitives.lmn)),
+        spherical=spherical,
     )
 
     # TODO(hh): this introduces some performance overhead into basis construction that
@@ -135,20 +141,10 @@ def basisset(structure: Structure, basis_name: str = "sto-3g") -> Basis:
     return basis
 
 
-# Mapping from L to Cartesian lmn angular momentum quantum numbers
-# fmt: off
-LMN_MAP = {
-    0: [(0, 0, 0)],
-    1: [(1, 0, 0), (0, 1, 0), (0, 0, 1)],
-    2: [(2, 0, 0), (1, 1, 0), (1, 0, 1), (0, 2, 0), (0, 1, 1), (0, 0, 2)],
-    3: [(3, 0, 0), (2, 1, 0), (2, 0, 1), (1, 2, 0), (1, 1, 1),
-        (1, 0, 2), (0, 3, 0), (0, 2, 1), (0, 1, 2), (0, 0, 3)],
-}
-# fmt: on
-
-
 @cache
-def _bse_to_orbitals(basis_name: str, atomic_number: int) -> Tuple[Orbital]:
+def _bse_to_orbitals(
+    basis_name: str, atomic_number: int, spherical: bool
+) -> Tuple[Orbital]:
     """
     Look up basis set parameters on the basis set exchange and build a tuple of Orbital.
 
@@ -158,6 +154,8 @@ def _bse_to_orbitals(basis_name: str, atomic_number: int) -> Tuple[Orbital]:
     Args:
         basis_name (str): The name of the basis set to lookup on the basis set exchange.
         atomic_number (int): The atomic number for the element to retrieve.
+        spherical (bool): flag to enable using spherical format Gaussian basis functions
+            as opposed to Cartesian format.
 
     Returns:
         Tuple[Orbital]: Tuple of Orbital objects corresponding to the specified basis
@@ -174,18 +172,22 @@ def _bse_to_orbitals(basis_name: str, atomic_number: int) -> Tuple[Orbital]:
     )
     bse_basis = sort_basis(bse_basis)["elements"]
     orbitals = []
+    zero_center = np.zeros(3, dtype=default_fptype())
 
     for s in bse_basis[str(atomic_number)]["electron_shells"]:
-        for lmn in LMN_MAP[s["angular_momentum"][0]]:
-            ao = Orbital.from_bse(
-                center=np.zeros(3, dtype=default_fptype()),
-                alphas=np.array(s["exponents"], dtype=default_fptype()),
-                lmn=np.array(lmn, dtype=np.int32),
-                coefficients=np.array(s["coefficients"], dtype=default_fptype()),
-            )
-            orbitals.append(ao)
+        L, alphas, coefficients = _parse_bse_shell(s)
+        assert len(coefficients) == len(alphas), "Expecting same size vectors!"
+        orbitals += make_shell(spherical, L, zero_center, alphas, coefficients)
 
     return tuple(orbitals)
+
+
+def _parse_bse_shell(shell_dict):
+    return (
+        shell_dict["angular_momentum"][0],
+        np.array(shell_dict["exponents"], dtype=default_fptype()).reshape(-1),
+        np.array(shell_dict["coefficients"], dtype=default_fptype()).reshape(-1),
+    )
 
 
 def basis_iter(basis: Basis):
@@ -244,116 +246,3 @@ def renorm(basis: Basis, mode: RenormMode = "orthonormal") -> Basis:
 
     C = n[basis.orbital_index] * basis.coefficients
     return eqx.tree_at(lambda b: b.coefficients, basis, C)
-
-
-def cart2sph_coef(lmn: tuple[int, int, int], l: int, m: int) -> complex:
-    """Transformation coefficients for Cartesian to spherical Gaussian basis functions.
-
-    This function calculates the transformation coefficient from a Cartesian Gaussian
-    function (defined by `lmn`) to a spherical Gaussian function (defined by `l` and
-    `m`). The formula used is based on the relationship between Cartesian and spherical
-    harmonics. See equation 15 of <https://doi.org/10.1002/qua.560540202>.
-
-
-    Args:
-        lmn (tuple): A tuple (lx, ly, lz) representing the angular momentum
-                     components of the Cartesian Gaussian function.
-        l (int): The total angular momentum quantum number of the spherical harmonic.
-        m (int): The magnetic quantum number of the spherical harmonic.
-
-    Returns:
-        complex: The transformation coefficient as a complex scalar
-    """
-    from scipy.special import binom, factorial
-
-    lmn, l, m = np.array(lmn), np.array(l), np.array(m)
-
-    # Check if j = (lx + ly - |m|) / 2 is an integer
-    abs_m = np.abs(m)
-    j = lmn[0] + lmn[1] - abs_m
-
-    if j % 2 != 0:
-        # j must be half-integral so coefficient must be zero
-        return np.array(0.0, dtype=complex)
-    else:
-        j = j // 2
-
-    # constant pre-factor
-    num = np.prod(factorial(2 * lmn)) * factorial(l) * factorial(l - abs_m)
-    dem = factorial(2 * l) * np.prod(factorial(lmn)) * factorial(l + abs_m)
-    out = np.sqrt(num / dem) / (2**l * factorial(l))
-
-    # sum_i taking into account that binom(p, q) is zero for q < 0 and q > p
-    # as well as avoiding negative factorial in the denominator
-    i = np.arange(np.maximum(j, 0), (l - abs_m) // 2 + 1)
-    iterm_num = binom(l, i) * binom(i, j) * (-1) ** i * factorial(2 * l - 2 * i)
-    out *= np.sum(iterm_num / factorial(l - abs_m - 2 * i))
-
-    k = np.arange(0, j + 1)
-    if len(k) > 0:
-        kterm = binom(j, k) * binom(abs_m, lmn[0] - 2 * k)
-        power = np.sign(m) * 0.5 * (abs_m - lmn[0] + 2 * k)
-        out *= np.sum(kterm * np.power(-1.0, power, dtype=complex))
-
-    return out.astype(complex)
-
-
-@cache
-def cart2sph_complex(l: int) -> np.ndarray:
-    """Transformation matrix for Cartesian to spherical Gaussian coefficients.
-
-    This function generates a transformation matrix that converts Cartesian Gaussian
-    coefficients to spherical Gaussian coefficients for a given total angular momentum
-    `l`. Each row of the matrix corresponds to a Cartesian basis function (defined by
-    `lmn` from `LMN_MAP[l]`), and each column corresponds to a spherical basis function
-    (defined by `m` from `-l` to `l`).
-
-    Args:
-        l (int): The total angular momentum quantum number.
-
-    Returns:
-        np.ndarray: A 2D NumPy array representing the transformation matrix.
-                    The shape of the matrix is `(num_cartesian_functions, 2*l + 1)`.
-    """
-
-    return np.asarray([
-        [cart2sph_coef(lmn, l, m) for m in range(-l, l + 1)] for lmn in LMN_MAP[l]
-    ])
-
-
-@cache
-def cart2sph_real(l: int) -> np.ndarray:
-    """Transformation matrix for Cartesian to real spherical Gaussian coefficients.
-
-    This function generates a transformation matrix that converts Cartesian Gaussian
-    coefficients to real spherical Gaussian coefficients for a given total angular
-    momentum `l`. Each row of the matrix corresponds to a Cartesian basis function
-    (defined by `lmn` from `LMN_MAP[l]`), and each column corresponds to a real
-    spherical basis function (defined by `m` from `-l` to `l`, ordered as
-    -l, ..., -1, 0, 1, ..., l).
-
-    Args:
-        l (int): The total angular momentum quantum number.
-
-    Returns:
-        np.ndarray: A 2D NumPy array representing the transformation matrix.
-                    The shape of the matrix is `(num_cartesian_functions, 2*l + 1)`.
-    """
-
-    out = deque()
-    t0 = np.array([cart2sph_coef(lmn, l, 0) for lmn in LMN_MAP[l]]).real
-    out.append(t0)
-
-    for m in range(1, l + 1):
-        m_pos = np.array([cart2sph_coef(lmn, l, m) for lmn in LMN_MAP[l]])
-        m_neg = np.array([cart2sph_coef(lmn, l, -m) for lmn in LMN_MAP[l]])
-        plus = (m_neg + m_pos) / np.sqrt(2)
-        minus = (m_neg - m_pos) * 1j / np.sqrt(2)
-        out.appendleft(np.real_if_close(minus))
-        out.append(np.real_if_close(plus))
-
-    # transpose so leading dim is in cartesian basis and clip small elements to zero
-    out = np.array(out).T
-    eps = np.finfo(out.dtype).eps
-    out[np.abs(out) < eps] = 0.0
-    return out

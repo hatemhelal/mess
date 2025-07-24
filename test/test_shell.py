@@ -1,5 +1,5 @@
 import numpy as np
-from mess.basis import cart2sph_complex
+from mess.shell import cart2sph_complex
 
 import pytest
 from numpy.testing import assert_allclose
