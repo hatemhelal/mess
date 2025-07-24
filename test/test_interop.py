@@ -7,7 +7,7 @@ from mess.basis import basisset, renorm
 from mess.interop import to_pyscf
 from mess.mesh import density, density_and_grad, uniform_mesh
 from mess.structure import molecule, nuclear_energy, Structure
-
+from conftest import is_mem_limited
 
 mol_cases = {
     "water": molecule("water"),
@@ -24,6 +24,7 @@ def test_to_pyscf(basis_name, spherical):
     assert basis.num_orbitals == pyscf_mol.nao
 
 
+@pytest.mark.skipif(is_mem_limited(), reason="Not enough host memory!")
 @pytest.mark.parametrize("basis_name", ["6-31g*", "def2-SVP"])
 @pytest.mark.parametrize("spherical", [True, False])
 @pytest.mark.parametrize("mol", mol_cases.values(), ids=mol_cases.keys())
