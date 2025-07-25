@@ -109,7 +109,7 @@ def make_spherical_shell(L, center, alphas, coefficients):
         num_primitives = len(alphas)
 
         lmns = np.tile(np.array(lmns, dtype=np.int32), (num_primitives, 1))
-        sph_c = sph_c[:, None] * coefficients[None, :]
+        sph_c = coefficients[:, None] * sph_c[None, :]
         sph_alphas = np.repeat(alphas, num_cart_components)
 
         ao = make_contraction(center, sph_alphas, lmns, sph_c.reshape(-1))

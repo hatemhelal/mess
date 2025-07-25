@@ -11,7 +11,7 @@ from conftest import is_mem_limited
 
 mol_cases = {
     "water": molecule("water"),
-    "Ar": Structure(np.asarray(18), np.zeros(3)),
+    "Kr": Structure(np.asarray(36), np.zeros(3)),
 }
 
 
