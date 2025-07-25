@@ -16,4 +16,4 @@ def is_mem_limited():
     import psutil
 
     total_mem_gib = psutil.virtual_memory().total // 1024**3
-    return total_mem_gib < 20
+    return total_mem_gib < 16
