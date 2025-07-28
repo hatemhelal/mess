@@ -1,5 +1,7 @@
 import numpy as np
-
+from functools import cache
+from mess.types import FloatN
+from periodictable import elements
 
 """
 Bragg-Slater atomic radii in Angstroms.
@@ -42,3 +44,18 @@ BRAGG_SLATER = np.array([
     np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
 ])
 # fmt:on
+
+
+@cache
+def covalent_radii() -> FloatN:
+    """Covalent radii in Angstroms.
+
+    References
+    ----------
+    The values are parsed from `periodictable.elements` which in turn uses data from
+    {cite}`cordero2008covalent`.
+    """
+
+    R = np.float64([e.covalent_radius for e in elements])
+    R = np.insert(R, 0, np.nan)
+    return R
