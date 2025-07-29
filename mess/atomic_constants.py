@@ -3,14 +3,6 @@ from functools import cache
 from mess.types import FloatN
 from periodictable import elements
 
-"""
-Bragg-Slater atomic radii in Angstroms.
-
-References
-----------
-The values are parsed from Table I of {cite}`slater1964atomic` and are referred to as
-the Bragg-Slater radii in {cite}`becke1988multicenter`
-"""
 # fmt:off
 BRAGG_SLATER = np.array([
     # Placeholder at index 0
@@ -44,16 +36,31 @@ BRAGG_SLATER = np.array([
     np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
 ])
 # fmt:on
+"""
+Bragg-Slater atomic radii in Angstroms.
+
+The values are parsed from Table I of [1]_ and are referred to as
+the Bragg-Slater radii in [2]_.
+
+.. [1] J. C. Slater, "Atomic Radii in Crystals", The Journal of Chemical Physics,
+       vol. 41, no. 10, pp. 3199-3204, Nov. 1964, https://doi.org/10.1063/1.1725697.
+.. [2] A. D. Becke, "A multicenter numerical integration scheme for polyatomic
+       molecules", The Journal of Chemical Physics, vol. 88, no. 4, pp. 2547-2553, Feb.
+       1988, https://doi.org/10.1063/1.454033.
+
+"""
 
 
 @cache
 def covalent_radii() -> FloatN:
     """Covalent radii in Angstroms.
 
-    References
-    ----------
-    The values are parsed from `periodictable.elements` which in turn uses data from
-    {cite}`cordero2008covalent`.
+    The values are parsed from ``periodictable.elements`` which in turn uses data from
+    [1]_.
+
+    .. [1] B. Cordero et al., "Covalent radii revisited", Dalton Trans., no. 21, pp.
+           2832-2838, May 2008, https://doi.org/10.1039/B801115J.
+
     """
 
     R = np.float64([e.covalent_radius for e in elements])
