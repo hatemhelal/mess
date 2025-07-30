@@ -1,6 +1,7 @@
 import numpy as np
 from functools import cache
 from mess.types import FloatN
+from mess.units import to_bohr
 from periodictable import elements
 
 # fmt:off
@@ -35,9 +36,10 @@ BRAGG_SLATER = np.array([
     np.nan, 2.15, 1.95, 1.80, 1.80, 1.75, 1.75, 1.75, 1.75, np.nan,  # Actinides
     np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
 ])
+BRAGG_SLATER = to_bohr(BRAGG_SLATER)
 # fmt:on
 """
-Bragg-Slater atomic radii in Angstroms.
+Bragg-Slater atomic radii in Bohr.
 
 The values are parsed from Table I of [1]_ and are referred to as
 the Bragg-Slater radii in [2]_.
@@ -53,7 +55,7 @@ the Bragg-Slater radii in [2]_.
 
 @cache
 def covalent_radii() -> FloatN:
-    """Covalent radii in Angstroms.
+    """Covalent radii in Bohr.
 
     The values are parsed from ``periodictable.elements`` which in turn uses data from
     [1]_.
@@ -65,4 +67,40 @@ def covalent_radii() -> FloatN:
 
     R = np.float64([e.covalent_radius for e in elements])
     R = np.insert(R, 0, np.nan)
+    R = to_bohr(R)
     return R
+
+
+@cache
+def sg1_atomic_radii() -> FloatN:
+    r"""
+    SG1 atomic radii in Bohr.
+
+    The values are taken from Table I of [1]_ where these are defined as the maximum of
+    the radial probability function :math:`4 \pi r^2 \phi^2(\mathbf{r})`.
+
+    .. [1] P. M. W. Gill, B. G. Johnson, and J. A. Pople, "A standard grid for density
+           functional calculations", Chemical Physics Letters, vol. 209, no. 5-6, pp.
+           506-512, Jul. 1993, doi: https://doi.org/10.1016/0009-2614(93)80125-9.
+    """
+    return np.array([
+        np.nan,  # Z=0 placeholder
+        1.0000,  # H
+        0.5882,  # He
+        3.0769,  # Li
+        2.0513,  # Be
+        1.5385,  # B
+        1.2308,  # C
+        1.0256,  # N
+        0.8791,  # O
+        0.7692,  # F
+        0.6838,  # Ne
+        4.0909,  # Na
+        3.1579,  # Mg
+        2.5714,  # Al
+        2.1687,  # Si
+        1.8750,  # P
+        1.6514,  # S
+        1.4754,  # Cl
+        1.3333,  # Ar
+    ])

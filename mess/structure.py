@@ -127,7 +127,8 @@ def nuclear_energy(structure: Structure) -> float:
 
     Evaluated by taking sum over all unique pairs of atom centers:
 
-    .. math:: \\sum_{j > i} \\frac{Z_i Z_j}{|\\mathbf{r}_i - \\mathbf{r}_j|}
+    .. math::
+        \sum_{j > i} \frac{Z_i Z_j}{|\mathbf{r}_i - \mathbf{r}_j|}
 
     where :math:`z_i` is the charge of the ith atom (the atomic number).
 
