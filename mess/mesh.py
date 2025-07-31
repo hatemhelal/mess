@@ -2,11 +2,14 @@
 
 from typing import Optional, Tuple, Union
 
+import numpy as np
 import equinox as eqx
 import jax.numpy as jnp
 from pyscf import dft
 from jax import vjp
+from scipy.integrate import lebedev_rule
 
+from mess.atomic_constants import sg1_atomic_radii
 from mess.basis import Basis
 from mess.interop import to_pyscf
 from mess.structure import Structure
@@ -74,3 +77,24 @@ def xcmesh_from_pyscf(structure: Structure, level: int = 3) -> Mesh:
     grids.level = level
     grids.build()
     return Mesh(points=grids.coords, weights=grids.weights)
+
+
+def sg1_mesh(
+    structure: Structure, num_radial: int = 50, angular_order: int = 23
+) -> Mesh:
+    atom_radius = sg1_atomic_radii()[structure.atomic_number]
+    atom_radius = atom_radius.reshape(-1, 1)
+    ii = np.arange(1, num_radial + 1)
+    rad_weights = (
+        2 * atom_radius**3 * (num_radial + 1) * ii**5 / (num_radial + 1 - ii) ** 7
+    )
+    rad_points = atom_radius * ii**2 / (num_radial + 1 - ii) ** 2
+    ang_points, ang_weights = lebedev_rule(angular_order)
+
+    # Outer product of radial and angular points to form atom centered.
+    # [num_atoms, num_rad] x [num_ang, 3] -> [num_atoms, num_rad, num_ang, 3]
+    points = np.einsum("ij,kl->ijlk", rad_points, ang_points)
+    points = points + structure.position[:, None, None, :]
+    weights = np.einsum("ij,l->ijl", rad_weights, ang_weights)
+
+    return Mesh(points=points.reshape(-1, 3), weights=weights.reshape(-1))

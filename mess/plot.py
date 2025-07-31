@@ -6,6 +6,7 @@ from more_itertools import chunked
 from numpy.typing import NDArray
 
 from mess.structure import Structure
+from mess.mesh import Mesh
 from mess.types import MeshAxes
 from mess.units import to_angstrom
 
@@ -177,3 +178,43 @@ def build_transferfn(value: NDArray) -> dict:
             {"color": "red", "opacity": a[0], "value": v[0]},
         ]
     }
+
+
+def plot_mesh(
+    view: py3Dmol.view,
+    mesh: Mesh,
+    max_points: int = 1000,
+    radius: float = 0.05,
+    color: str = "blue",
+    opacity: float = 0.8,
+) -> py3Dmol.view:
+    """Plots a subset of mesh points as spheres.
+
+    Args:
+        view (py3Dmol.view): py3DMol View to which to add visualizer.
+        mesh (Mesh): The mesh to visualize.
+        max_points (int): The maximum number of points to plot. A random subset
+                          is taken if the mesh has more points.
+        radius (float): The radius of the spheres representing mesh points.
+        color (str): The color of the spheres.
+        opacity (float): The opacity of the spheres.
+
+    Returns:
+        py3DMol View object
+    """
+    points = to_angstrom(mesh.points)
+
+    if points.shape[0] > max_points:
+        indices = np.random.choice(points.shape[0], max_points, replace=False)
+        points = points[indices, :]
+
+    weights = radius * mesh.weights / mesh.weights.max()
+    for idx, p in enumerate(points):
+        view.addSphere({
+            "center": {"x": p[0], "y": p[1], "z": p[2]},
+            "radius": weights[idx],
+            "color": color,
+            "opacity": opacity,
+        })
+
+    return view
