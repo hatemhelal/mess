@@ -85,7 +85,7 @@ def cell_function(mu, k=3):
             x = 1.5 * x - 0.5 * x**3
         return x
 
-    return 0.5 * (1 - f(mu, k))
+    return 0.5 * (1 - f(mu))
 
 
 def sg1_mesh(
@@ -118,12 +118,17 @@ def sg1_mesh(
     ii, jj = np.triu_indices(structure.num_atoms, 1)
     ri_vec = points[:, None, :] - structure.position[None, ii, None, :]
     ri = np.linalg.norm(ri_vec, axis=-1)
+
     rj_vec = points[:, None, :] - structure.position[None, jj, None, :]
     rj = np.linalg.norm(rj_vec, axis=-1)
-    R_ij = np.linalg.norm(structure.position[ii, :] - structure.position[jj, :], axis=1)
-    mu = (ri - rj) / R_ij[:, None]
+
+    R_ij_vec = structure.position[ii, :] - structure.position[jj, :]
+    R_ij = np.linalg.norm(R_ij_vec, axis=1)
+
+    mu = (ri - rj) / (R_ij[:, None] + epsilon)
     s = cell_function(mu)
     P = np.prod(s, axis=1)
-    w = P / np.sum(P, axis=0)
+    w = P / (np.sum(P, axis=0) + epsilon)
+
     weights = weights * w
     return Mesh(points.reshape(-1, 3), weights.reshape(-1))
