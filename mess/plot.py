@@ -183,7 +183,7 @@ def build_transferfn(value: NDArray) -> dict:
 def plot_mesh(
     view: py3Dmol.view,
     mesh: Mesh,
-    max_points: int = 1000,
+    max_points: int = 10000,
     radius: float = 0.05,
     color: str = "blue",
     opacity: float = 0.8,
