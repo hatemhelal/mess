@@ -79,8 +79,20 @@ def xcmesh_from_pyscf(structure: Structure, level: int = 3) -> Mesh:
     return Mesh(points=grids.coords, weights=grids.weights)
 
 
+def cell_function(mu, k=3):
+    def f(x):
+        for _ in range(k):
+            x = 1.5 * x - 0.5 * x**3
+        return x
+
+    return 0.5 * (1 - f(mu, k))
+
+
 def sg1_mesh(
-    structure: Structure, num_radial: int = 50, angular_order: int = 23
+    structure: Structure,
+    num_radial: int = 50,
+    angular_order: int = 23,
+    epsilon: float = 1e-12,
 ) -> Mesh:
     atom_radius = sg1_atomic_radii()[structure.atomic_number]
     atom_radius = atom_radius.reshape(-1, 1)
@@ -91,10 +103,27 @@ def sg1_mesh(
     rad_points = atom_radius * ii**2 / (num_radial + 1 - ii) ** 2
     ang_points, ang_weights = lebedev_rule(angular_order)
 
-    # Outer product of radial and angular points to form atom centered.
+    # Outer product of radial and angular points to form atom centered meshes
     # [num_atoms, num_rad] x [num_ang, 3] -> [num_atoms, num_rad, num_ang, 3]
     points = np.einsum("ij,kl->ijlk", rad_points, ang_points)
     points = points + structure.position[:, None, None, :]
+
+    # [num_atoms, num_rad] x [num_ang -> [num_atoms, num_rad, num_ang]
     weights = np.einsum("ij,l->ijl", rad_weights, ang_weights)
 
-    return Mesh(points=points.reshape(-1, 3), weights=weights.reshape(-1))
+    # Points and weights grouped by atom
+    points = points.reshape(structure.num_atoms, -1, 3)
+    weights = weights.reshape(structure.num_atoms, -1)
+
+    ii, jj = np.triu_indices(structure.num_atoms, 1)
+    ri_vec = points[:, None, :] - structure.position[None, ii, None, :]
+    ri = np.linalg.norm(ri_vec, axis=-1)
+    rj_vec = points[:, None, :] - structure.position[None, jj, None, :]
+    rj = np.linalg.norm(rj_vec, axis=-1)
+    R_ij = np.linalg.norm(structure.position[ii, :] - structure.position[jj, :], axis=1)
+    mu = (ri - rj) / R_ij[:, None]
+    s = cell_function(mu)
+    P = np.prod(s, axis=1)
+    w = P / np.sum(P, axis=0)
+    weights = weights * w
+    return Mesh(points.reshape(-1, 3), weights.reshape(-1))
