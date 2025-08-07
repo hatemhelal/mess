@@ -1,12 +1,13 @@
 """Discretised sampling of orbitals and charge density."""
 
+from functools import partial
 from typing import Optional, Tuple, Union
 
-import numpy as np
 import equinox as eqx
 import jax.numpy as jnp
+import numpy as np
+from jax import jit, vjp, vmap
 from pyscf import dft
-from jax import vjp
 from scipy.integrate import lebedev_rule
 
 from mess.atomic_constants import sg1_atomic_radii
@@ -127,42 +128,43 @@ def sg1_mesh(
 
     atom_radius = sg1_atomic_radii()[structure.atomic_number]
     atom_radius = atom_radius.reshape(-1, 1)
-    ii = np.arange(1, num_radial + 1)
+    ii = jnp.arange(1, num_radial + 1)
     rad_weights = (
         2 * atom_radius**3 * (num_radial + 1) * ii**5 / (num_radial + 1 - ii) ** 7
     )
     rad_points = atom_radius * ii**2 / (num_radial + 1 - ii) ** 2
-    ang_points, ang_weights = lebedev_rule(angular_order)
+    ang_points, ang_weights = jit(lebedev_rule, static_argnums=0)(angular_order)
 
     # Outer product of radial and angular points to form atom centered meshes
     # [num_atoms, num_rad] x [num_ang, 3] -> [num_atoms, num_rad, num_ang, 3]
-    points = np.einsum("ij,kl->ijlk", rad_points, ang_points)
-    points = points + structure.position[:, None, None, :]
+    points = jnp.einsum("ij,kl->ijlk", rad_points, ang_points)
 
     # [num_atoms, num_rad] x [num_ang -> [num_atoms, num_rad, num_ang]
     weights = np.einsum("ij,l->ijl", rad_weights, ang_weights)
 
-    # Points and weights grouped by atom
+    # Points and weights grouped by atom and centered on atoms
     points = points.reshape(structure.num_atoms, -1, 3)  # [num_atoms, num_grid, 3]
+    points = points + structure.position[:, None, :]
     weights = weights.reshape(structure.num_atoms, -1)  # [num_atoms, num_grid]
 
-    # For each atom-centered grid, evaluate the distance from each mesh point to all
-    # unique pairs of atoms
-    ii, jj = np.triu_indices(structure.num_atoms, 1)
-    ri_vec = points[:, None, :] - structure.position[None, ii, None, :]
-    ri = np.linalg.norm(ri_vec, axis=-1)
-    rj_vec = points[:, None, :] - structure.position[None, jj, None, :]
-    rj = np.linalg.norm(rj_vec, axis=-1)
-
-    # pairwise distances between atom centers
-    R_ij_vec = structure.position[ii, :] - structure.position[jj, :]
-    R_ij = np.linalg.norm(R_ij_vec, axis=1)
-
     # confocal elliptical coordinate (Becke 1988 eq 11)
-    mu = (ri - rj) / (R_ij[:, None] + epsilon)
+    @partial(vmap, in_axes=(None, 0, 0))
+    @partial(vmap, in_axes=(0, None, None))
+    def mu_func(rp, Ri, Rj):
+        ri = jnp.linalg.norm(rp - Ri)
+        rj = jnp.linalg.norm(rp - Rj)
+        Rij = jnp.linalg.norm(Ri - Rj)
+        return (ri - rj) / Rij
+
+    # For each atom-centered grid, calc the distance from each mesh point to atom pairs
+    num_pairs = structure.num_atoms * (structure.num_atoms - 1)
+    ii, jj = jnp.nonzero(~jnp.eye(structure.num_atoms, dtype=bool), size=num_pairs)
+    Ri = structure.position[ii]
+    Rj = structure.position[jj]
+    mu = mu_func(points, Ri, Rj)
+
     s = cell_function(mu)
-    P = np.prod(s, axis=1)
-    w = P / (np.sum(P, axis=0) + epsilon)
-    weights = weights * w
+    P = jnp.prod(s, axis=1)
+    weights = weights * (P / jnp.sum(P, axis=0))
 
     return Mesh(points.reshape(-1, 3), weights.reshape(-1))
