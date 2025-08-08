@@ -80,12 +80,62 @@ def xcmesh_from_pyscf(structure: Structure, level: int = 3) -> Mesh:
 
 
 def cell_function(mu, k=3):
+    """A polynomial smoothing function for Becke partitioning."""
+
     def f(x):
         for _ in range(k):
             x = 1.5 * x - 0.5 * x**3
         return x
 
     return 0.5 * (1 - f(mu))
+
+
+def becke_partition(structure: Structure, points: FloatNx3, weights: FloatN) -> Mesh:
+    """Partitions a molecular grid using Becke's scheme.
+
+    This function implements Becke's partitioning scheme [1]_ to assign weights to grid
+    points based on their proximity to different atomic centers in a molecule. This
+    ensures that each point contributes to the integral in a way that smoothly
+    transitions between atomic regions.
+
+    Args:
+        structure (Structure): The molecular structure defining the atomic centers.
+        points (FloatNx3): An array of grid points, typically generated from
+            atom-centered grids. The shape is (num_atoms, num_grid_points_per_atom, 3).
+        weights (FloatN): An array of initial weights for each grid point,
+            corresponding to the `points` array. The shape is
+            (num_atoms, num_grid_points_per_atom).
+
+    Returns:
+        Mesh: A Mesh object containing the partitioned points and their new weights.
+
+    .. [1] A. D. Becke, "A multicenter numerical integration scheme for polyatomic
+           molecules", The Journal of Chemical Physics, vol. 88, no. 4, pp. 2547-2553,
+           Feb. 1988, https://doi.org/10.1063/1.454033.
+    """
+
+    # confocal elliptical coordinate ([1] eq 11) vmap is used to convert this scalar
+    # function to a map over mesh points and pairs of atom centers
+    @partial(vmap, in_axes=(None, 0, 0))
+    @partial(vmap, in_axes=(0, None, None))
+    def calculate_mu(rp, Ri, Rj):
+        ri = jnp.linalg.norm(rp - Ri)
+        rj = jnp.linalg.norm(rp - Rj)
+        Rij = jnp.linalg.norm(Ri - Rj)
+        return (ri - rj) / Rij
+
+    # For each atom-centered grid, calc the distance from each mesh point to atom pairs
+    num_pairs = structure.num_atoms * (structure.num_atoms - 1)
+    ii, jj = jnp.nonzero(~jnp.eye(structure.num_atoms, dtype=bool), size=num_pairs)
+    Ri = structure.position[ii]
+    Rj = structure.position[jj]
+    mu = calculate_mu(points.reshape(-1, 3), Ri, Rj)
+    s = cell_function(mu)
+    s = s.reshape(structure.num_atoms, structure.num_atoms - 1, *weights.shape)
+    P = jnp.prod(s, axis=1)
+    weights = weights * (P[jnp.diag_indices(structure.num_atoms)] / jnp.sum(P, axis=0))
+
+    return Mesh(points.reshape(-1, 3), weights.reshape(-1))
 
 
 @partial(jit, static_argnums=(1, 2))
@@ -142,24 +192,4 @@ def sg1_mesh(
     points = points + structure.position[:, None, :]
     weights = weights.reshape(structure.num_atoms, -1)  # [num_atoms, num_grid]
 
-    # confocal elliptical coordinate (Becke 1988 eq 11)
-    @partial(vmap, in_axes=(None, 0, 0))
-    @partial(vmap, in_axes=(0, None, None))
-    def calculate_mu(rp, Ri, Rj):
-        ri = jnp.linalg.norm(rp - Ri)
-        rj = jnp.linalg.norm(rp - Rj)
-        Rij = jnp.linalg.norm(Ri - Rj)
-        return (ri - rj) / Rij
-
-    # For each atom-centered grid, calc the distance from each mesh point to atom pairs
-    num_pairs = structure.num_atoms * (structure.num_atoms - 1)
-    ii, jj = jnp.nonzero(~jnp.eye(structure.num_atoms, dtype=bool), size=num_pairs)
-    Ri = structure.position[ii]
-    Rj = structure.position[jj]
-    mu = calculate_mu(points.reshape(-1, 3), Ri, Rj)
-    s = cell_function(mu)
-    s = s.reshape(structure.num_atoms, structure.num_atoms - 1, *weights.shape)
-    P = jnp.prod(s, axis=1)
-    weights = weights * (P[jnp.diag_indices(structure.num_atoms)] / jnp.sum(P, axis=0))
-
-    return Mesh(points.reshape(-1, 3), weights.reshape(-1))
+    return becke_partition(structure, points, weights)
