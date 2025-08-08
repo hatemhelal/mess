@@ -23,7 +23,7 @@ def test_sg1_overlap(lmn):
 
 def test_charge_quadrature():
     structure = molecule("benzene")
-    mesh = sg1_mesh(structure)
+    mesh = sg1_mesh(structure, num_radial=128, angular_order=41)
     basis = basisset(structure, "sto-3g")
     actual_Q = mesh.weights @ density(basis, mesh)
     assert_allclose(actual_Q, structure.num_electrons)

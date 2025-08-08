@@ -5,7 +5,6 @@ from typing import Optional, Tuple, Union
 
 import equinox as eqx
 import jax.numpy as jnp
-import numpy as np
 from jax import jit, vjp, vmap
 from pyscf import dft
 from scipy.integrate import lebedev_rule
@@ -89,11 +88,9 @@ def cell_function(mu, k=3):
     return 0.5 * (1 - f(mu))
 
 
+@partial(jit, static_argnums=(1, 2))
 def sg1_mesh(
-    structure: Structure,
-    num_radial: int = 50,
-    angular_order: int = 23,
-    epsilon: float = 1e-12,
+    structure: Structure, num_radial: int = 50, angular_order: int = 23
 ) -> Mesh:
     """Builds a molecular quadrature grid using the SG1 scheme.
 
@@ -109,8 +106,6 @@ def sg1_mesh(
             Euler-Maclaurin scheme. Defaults to 50.
         angular_order (int, optional): The order of the Lebedev-Laikov angular grid.
             Defaults to 23.
-        epsilon (float, optional): A small value added to denominators to prevent
-            division by zero. Defaults to 1e-12.
 
     Returns:
         Mesh: A Mesh object containing the SG1 points and weights.
@@ -126,21 +121,21 @@ def sg1_mesh(
            Feb. 1988, https://doi.org/10.1063/1.454033.
     """
 
-    atom_radius = sg1_atomic_radii()[structure.atomic_number]
+    atom_radius = jnp.asarray(sg1_atomic_radii())[structure.atomic_number]
     atom_radius = atom_radius.reshape(-1, 1)
     ii = jnp.arange(1, num_radial + 1)
     rad_weights = (
         2 * atom_radius**3 * (num_radial + 1) * ii**5 / (num_radial + 1 - ii) ** 7
     )
     rad_points = atom_radius * ii**2 / (num_radial + 1 - ii) ** 2
-    ang_points, ang_weights = jit(lebedev_rule, static_argnums=0)(angular_order)
+    ang_points, ang_weights = lebedev_rule(angular_order)
 
     # Outer product of radial and angular points to form atom centered meshes
     # [num_atoms, num_rad] x [num_ang, 3] -> [num_atoms, num_rad, num_ang, 3]
     points = jnp.einsum("ij,kl->ijlk", rad_points, ang_points)
 
     # [num_atoms, num_rad] x [num_ang -> [num_atoms, num_rad, num_ang]
-    weights = np.einsum("ij,l->ijl", rad_weights, ang_weights)
+    weights = jnp.einsum("ij,l->ijl", rad_weights, ang_weights)
 
     # Points and weights grouped by atom and centered on atoms
     points = points.reshape(structure.num_atoms, -1, 3)  # [num_atoms, num_grid, 3]
@@ -150,7 +145,7 @@ def sg1_mesh(
     # confocal elliptical coordinate (Becke 1988 eq 11)
     @partial(vmap, in_axes=(None, 0, 0))
     @partial(vmap, in_axes=(0, None, None))
-    def mu_func(rp, Ri, Rj):
+    def calculate_mu(rp, Ri, Rj):
         ri = jnp.linalg.norm(rp - Ri)
         rj = jnp.linalg.norm(rp - Rj)
         Rij = jnp.linalg.norm(Ri - Rj)
@@ -161,10 +156,10 @@ def sg1_mesh(
     ii, jj = jnp.nonzero(~jnp.eye(structure.num_atoms, dtype=bool), size=num_pairs)
     Ri = structure.position[ii]
     Rj = structure.position[jj]
-    mu = mu_func(points, Ri, Rj)
-
+    mu = calculate_mu(points.reshape(-1, 3), Ri, Rj)
     s = cell_function(mu)
+    s = s.reshape(structure.num_atoms, structure.num_atoms - 1, *weights.shape)
     P = jnp.prod(s, axis=1)
-    weights = weights * (P / jnp.sum(P, axis=0))
+    weights = weights * (P[jnp.diag_indices(structure.num_atoms)] / jnp.sum(P, axis=0))
 
     return Mesh(points.reshape(-1, 3), weights.reshape(-1))
