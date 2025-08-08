@@ -1,12 +1,12 @@
 """Discretised sampling of orbitals and charge density."""
 
+from functools import partial
 from typing import Optional, Tuple, Union
 
-import numpy as np
 import equinox as eqx
 import jax.numpy as jnp
+from jax import jit, vjp, vmap
 from pyscf import dft
-from jax import vjp
 from scipy.integrate import lebedev_rule
 
 from mess.atomic_constants import sg1_atomic_radii
@@ -80,6 +80,8 @@ def xcmesh_from_pyscf(structure: Structure, level: int = 3) -> Mesh:
 
 
 def cell_function(mu, k=3):
+    """A polynomial smoothing function for Becke partitioning."""
+
     def f(x):
         for _ in range(k):
             x = 1.5 * x - 0.5 * x**3
@@ -88,11 +90,57 @@ def cell_function(mu, k=3):
     return 0.5 * (1 - f(mu))
 
 
+def becke_partition(structure: Structure, points: FloatNx3, weights: FloatN) -> Mesh:
+    """Partitions a molecular grid using Becke's scheme.
+
+    This function implements Becke's partitioning scheme [1]_ to assign weights to grid
+    points based on their proximity to different atomic centers in a molecule. This
+    ensures that each point contributes to the integral in a way that smoothly
+    transitions between atomic regions.
+
+    Args:
+        structure (Structure): The molecular structure defining the atomic centers.
+        points (FloatNx3): An array of grid points, typically generated from
+            atom-centered grids. The shape is (num_atoms, num_grid_points_per_atom, 3).
+        weights (FloatN): An array of initial weights for each grid point,
+            corresponding to the `points` array. The shape is
+            (num_atoms, num_grid_points_per_atom).
+
+    Returns:
+        Mesh: A Mesh object containing the partitioned points and their new weights.
+
+    .. [1] A. D. Becke, "A multicenter numerical integration scheme for polyatomic
+           molecules", The Journal of Chemical Physics, vol. 88, no. 4, pp. 2547-2553,
+           Feb. 1988, https://doi.org/10.1063/1.454033.
+    """
+
+    # confocal elliptical coordinate ([1] eq 11) vmap is used to convert this scalar
+    # function to a map over mesh points and pairs of atom centers
+    @partial(vmap, in_axes=(None, 0, 0))
+    @partial(vmap, in_axes=(0, None, None))
+    def calculate_mu(rp, Ri, Rj):
+        ri = jnp.linalg.norm(rp - Ri)
+        rj = jnp.linalg.norm(rp - Rj)
+        Rij = jnp.linalg.norm(Ri - Rj)
+        return (ri - rj) / Rij
+
+    # For each atom-centered grid, calc the distance from each mesh point to atom pairs
+    num_pairs = structure.num_atoms * (structure.num_atoms - 1)
+    ii, jj = jnp.nonzero(~jnp.eye(structure.num_atoms, dtype=bool), size=num_pairs)
+    Ri = structure.position[ii]
+    Rj = structure.position[jj]
+    mu = calculate_mu(points.reshape(-1, 3), Ri, Rj)
+    s = cell_function(mu)
+    s = s.reshape(structure.num_atoms, structure.num_atoms - 1, *weights.shape)
+    P = jnp.prod(s, axis=1)
+    weights = weights * (P[jnp.diag_indices(structure.num_atoms)] / jnp.sum(P, axis=0))
+
+    return Mesh(points.reshape(-1, 3), weights.reshape(-1))
+
+
+@partial(jit, static_argnums=(1, 2))
 def sg1_mesh(
-    structure: Structure,
-    num_radial: int = 50,
-    angular_order: int = 23,
-    epsilon: float = 1e-12,
+    structure: Structure, num_radial: int = 50, angular_order: int = 23
 ) -> Mesh:
     """Builds a molecular quadrature grid using the SG1 scheme.
 
@@ -108,8 +156,6 @@ def sg1_mesh(
             Euler-Maclaurin scheme. Defaults to 50.
         angular_order (int, optional): The order of the Lebedev-Laikov angular grid.
             Defaults to 23.
-        epsilon (float, optional): A small value added to denominators to prevent
-            division by zero. Defaults to 1e-12.
 
     Returns:
         Mesh: A Mesh object containing the SG1 points and weights.
@@ -125,9 +171,9 @@ def sg1_mesh(
            Feb. 1988, https://doi.org/10.1063/1.454033.
     """
 
-    atom_radius = sg1_atomic_radii()[structure.atomic_number]
+    atom_radius = jnp.asarray(sg1_atomic_radii())[structure.atomic_number]
     atom_radius = atom_radius.reshape(-1, 1)
-    ii = np.arange(1, num_radial + 1)
+    ii = jnp.arange(1, num_radial + 1)
     rad_weights = (
         2 * atom_radius**3 * (num_radial + 1) * ii**5 / (num_radial + 1 - ii) ** 7
     )
@@ -136,33 +182,14 @@ def sg1_mesh(
 
     # Outer product of radial and angular points to form atom centered meshes
     # [num_atoms, num_rad] x [num_ang, 3] -> [num_atoms, num_rad, num_ang, 3]
-    points = np.einsum("ij,kl->ijlk", rad_points, ang_points)
-    points = points + structure.position[:, None, None, :]
+    points = jnp.einsum("ij,kl->ijlk", rad_points, ang_points)
 
     # [num_atoms, num_rad] x [num_ang -> [num_atoms, num_rad, num_ang]
-    weights = np.einsum("ij,l->ijl", rad_weights, ang_weights)
+    weights = jnp.einsum("ij,l->ijl", rad_weights, ang_weights)
 
-    # Points and weights grouped by atom
+    # Points and weights grouped by atom and centered on atoms
     points = points.reshape(structure.num_atoms, -1, 3)  # [num_atoms, num_grid, 3]
+    points = points + structure.position[:, None, :]
     weights = weights.reshape(structure.num_atoms, -1)  # [num_atoms, num_grid]
 
-    # For each atom-centered grid, evaluate the distance from each mesh point to all
-    # unique pairs of atoms
-    ii, jj = np.triu_indices(structure.num_atoms, 1)
-    ri_vec = points[:, None, :] - structure.position[None, ii, None, :]
-    ri = np.linalg.norm(ri_vec, axis=-1)
-    rj_vec = points[:, None, :] - structure.position[None, jj, None, :]
-    rj = np.linalg.norm(rj_vec, axis=-1)
-
-    # pairwise distances between atom centers
-    R_ij_vec = structure.position[ii, :] - structure.position[jj, :]
-    R_ij = np.linalg.norm(R_ij_vec, axis=1)
-
-    # confocal elliptical coordinate (Becke 1988 eq 11)
-    mu = (ri - rj) / (R_ij[:, None] + epsilon)
-    s = cell_function(mu)
-    P = np.prod(s, axis=1)
-    w = P / (np.sum(P, axis=0) + epsilon)
-    weights = weights * w
-
-    return Mesh(points.reshape(-1, 3), weights.reshape(-1))
+    return becke_partition(structure, points, weights)
