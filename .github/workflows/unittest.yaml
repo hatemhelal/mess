@@ -31,4 +31,4 @@ jobs:
         run: uv run task test
 
       - name: Build MESS book
-        run: uv run task docs
+        run: uv run task doc
