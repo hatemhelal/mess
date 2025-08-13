@@ -28,20 +28,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: pip
+          python-version-file: pyproject.toml
 
-      - name: Install requirements
-        run: |
-          pip install -U pip
-          pip install .[dev]
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install MESS
+        run: uv sync --locked --all-extras --dev
 
       - name: Build book
-        run: |
-          jupyter-book build docs
+        run: uv run task docs
 
       - name: Setup Pages
         uses: actions/configure-pages@v3
