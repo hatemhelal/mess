@@ -41,10 +41,12 @@ dev = [
   "ipywidgets",
   "pytest",
   "pytest-benchmark",
+  "pytest-xdist[psutil]",
   "pre-commit",
   "ruff",
   "mdformat-gfm",
   "seaborn",
+  "taskipy",
 ]
 
 [project.urls]
@@ -74,3 +76,8 @@ extend-include = ["*.ipynb"]
 [tool.ruff.lint]
 select = ["E", "F"]
 ignore = ["E741"]
+
+[tool.taskipy.tasks]
+test = {cmd = "pytest -n auto --dist loadfile --benchmark-disable", help = "Run unit tests. Uses xdist and disables benchmarking."}
+bench = {cmd = "pytest --benchmark-only", help = "Collect benchmark metrics"}
+doc = {cmd = "jupyter-book build docs", help = "Build the documentation"}

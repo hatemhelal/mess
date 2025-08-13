@@ -36,13 +36,14 @@ def _setup_env():
     import os.path as osp
 
     from jax import config
-    from jax.experimental.compilation_cache import compilation_cache as cc
 
     enable_fp64 = parse_bool(os.environ.get("MESS_ENABLE_FP64", "True"))
     config.update("jax_enable_x64", enable_fp64)
 
     cache_dir = str(os.environ.get("MESS_CACHE_DIR", osp.expanduser("~/.cache/mess")))
-    cc.set_cache_dir(cache_dir)
+    config.update("jax_compilation_cache_dir", cache_dir)
+    config.update("jax_persistent_cache_min_compile_time_secs", 0.1)
+    config.update("jax_persistent_cache_enable_xla_caches", "all")
 
 
 _setup_env()
