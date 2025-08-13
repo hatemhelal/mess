@@ -18,7 +18,7 @@ The following assumes that you have already set up an install of [uv](https://do
 1. Install all required packages for developing MESS:
 
    ```bash
-   uv pip install -e .[dev]
+   uv pip install -e ".[dev]"
    ```
 
 1. Install the pre-commit hooks
@@ -40,10 +40,18 @@ The following assumes that you have already set up an install of [uv](https://do
 
 ## Testing
 
-Run all the tests using `pytest`
+Run all the tests with:
 
 ```bash
-uv run pytest
+uv run task test
+```
+
+## Performance Benchmarks
+
+Run all benchmarks with [pytest-benchmark](https://pytest-benchmark.readthedocs.io/en/latest/index.html):
+
+```bash
+uv run task bench
 ```
 
 ## Building Documentation
@@ -51,5 +59,5 @@ uv run pytest
 From the project root, you can build the documentation with:
 
 ```bash
-uv run jupyter-book build docs
+uv run task doc
 ```
