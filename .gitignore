@@ -1,3 +1,6 @@
+# somewhat against the advice but doing this anyway to support gpu as an optional dependency
+uv.lock
+
 # IDE
 .vscode
 

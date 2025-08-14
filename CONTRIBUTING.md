@@ -9,17 +9,13 @@ bugs encountered, or enhancement requests as
 The following assumes that you have already set up an install of [uv](https://docs.astral.sh/uv/) and that the
 `uv` command is available on your system path. Refer to the [uv install instructions](https://docs.astral.sh/uv/#installation) for your platform.
 
-1. Create a virtual environment with the minimum python version required:
+1. Create a virtual environment including all the development packages:
 
    ```bash
-   uv venv --python=3.11
+   uv sync --extra dev
    ```
 
-1. Install all required packages for developing MESS:
-
-   ```bash
-   uv pip install -e ".[dev]"
-   ```
+Adding the additional `--extra gpu` will install JAX configured for GPU execution.
 
 1. Install the pre-commit hooks
 
