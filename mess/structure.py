@@ -23,9 +23,9 @@ class Structure(eqx.Module):
         # single atom case
         self.atomic_number = np.atleast_1d(atomic_number)
         self.position = np.atleast_2d(position)
-        self.atomic_symbol = [elements[z].symbol for z in atomic_number]
-        self.num_electrons = int(np.sum(atomic_number))
-        self.num_atoms = len(atomic_number)
+        self.atomic_symbol = [elements[z].symbol for z in self.atomic_number]
+        self.num_electrons = int(np.sum(self.atomic_number))
+        self.num_atoms = len(self.atomic_number)
 
     def _repr_html_(self):
         import py3Dmol
