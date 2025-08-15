@@ -43,16 +43,6 @@ class Primitive(eqx.Module):
     def __call__(self, pos: FloatNx3) -> FloatN:
         return eval_primitive(self, pos)
 
-    def __hash__(self) -> int:
-        values = []
-        for k, v in vars(self).items():
-            if k.startswith("__") or v is None:
-                continue
-
-            values.append(v.tobytes())
-
-        return hash(b"".join(values))
-
 
 @jit
 def normalize(lmn: Int3, alpha: float) -> float:

@@ -26,29 +26,49 @@ from mess.types import (
 
 class Basis(eqx.Module):
     orbitals: Tuple[Orbital]
+    num_orbitals: int = eqx.field(static=True)
     structure: Structure
+    occupancy: FloatN
     primitives: Primitive
+    num_primitives: int = eqx.field(static=True)
     coefficients: FloatN
     orbital_index: IntN
     basis_name: str = eqx.field(static=True)
     max_L: int = eqx.field(static=True)
     spherical: bool = eqx.field(static=True)
 
-    @property
-    def num_orbitals(self) -> int:
-        return len(self.orbitals)
+    def __init__(self, structure: Structure, basis_name: str, spherical: bool = True):
+        self.structure = structure
+        self.basis_name = basis_name
+        self.spherical = spherical
 
-    @property
-    def num_primitives(self) -> int:
-        return sum(ao.num_primitives for ao in self.orbitals)
+        orbitals = []
+        atom_index = []
 
-    @property
-    def occupancy(self) -> FloatN:
-        # Assumes uncharged systems in restricted Kohn-Sham
-        occ = jnp.full(self.num_orbitals, 2.0)
-        mask = occ.cumsum() > self.structure.num_electrons
-        occ = jnp.where(mask, 0.0, occ)
-        return occ
+        for atom_id in range(structure.num_atoms):
+            element = int(structure.atomic_number[atom_id])
+            out = _bse_to_orbitals(basis_name, element, spherical)
+            atom_index.extend([atom_id] * sum(len(ao.primitives) for ao in out))
+            orbitals += out
+
+        primitives, coefficients, orbital_index = batch_orbitals(orbitals)
+        primitives = eqx.tree_at(
+            lambda p: p.atom_index, primitives, jnp.array(atom_index)
+        )
+        center = structure.position[primitives.atom_index, :]
+        primitives = eqx.tree_at(lambda p: p.center, primitives, center)
+
+        self.orbitals = orbitals
+        self.num_orbitals = len(orbitals)
+        self.num_primitives = sum(ao.num_primitives for ao in orbitals)
+        self.primitives = primitives
+        self.coefficients = coefficients
+        self.orbital_index = orbital_index
+        self.max_L = int(np.max(primitives.lmn))
+
+        occupancy = np.zeros(self.num_orbitals)
+        occupancy[: structure.num_electrons // 2] = 2.0
+        self.occupancy = occupancy
 
     def to_dataframe(self) -> pd.DataFrame:
         def fixer(x):
@@ -90,9 +110,6 @@ class Basis(eqx.Module):
         df = self.to_dataframe()
         return df._repr_html_()
 
-    def __hash__(self) -> int:
-        return hash(self.primitives)
-
 
 def basisset(
     structure: Structure, basis_name: str = "sto-3g", spherical: bool = True
@@ -110,30 +127,7 @@ def basisset(
     Returns:
         Basis constructed from inputs
     """
-    orbitals = []
-    atom_index = []
-
-    for atom_id in range(structure.num_atoms):
-        element = int(structure.atomic_number[atom_id])
-        out = _bse_to_orbitals(basis_name, element, spherical)
-        atom_index.extend([atom_id] * sum(len(ao.primitives) for ao in out))
-        orbitals += out
-
-    primitives, coefficients, orbital_index = batch_orbitals(orbitals)
-    primitives = eqx.tree_at(lambda p: p.atom_index, primitives, jnp.array(atom_index))
-    center = structure.position[primitives.atom_index, :]
-    primitives = eqx.tree_at(lambda p: p.center, primitives, center)
-
-    basis = Basis(
-        orbitals=orbitals,
-        structure=structure,
-        primitives=primitives,
-        coefficients=coefficients,
-        orbital_index=orbital_index,
-        basis_name=basis_name,
-        max_L=int(np.max(primitives.lmn)),
-        spherical=spherical,
-    )
+    basis = Basis(structure, basis_name, spherical)
 
     # TODO(hh): this introduces some performance overhead into basis construction that
     # could be pushed down into the cached orbitals.

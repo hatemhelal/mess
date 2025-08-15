@@ -23,6 +23,7 @@ from itertools import product as cartesian_product
 from more_itertools import batched
 from typing import Callable
 
+import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 from jax import jit, tree, vmap
@@ -44,7 +45,7 @@ from mess.units import LMAX
 BinaryPrimitiveOp = Callable[[Primitive, Primitive], float]
 
 
-@partial(jit, static_argnums=(0, 1))
+@partial(jit, static_argnums=1)
 def integrate_dense(basis: Basis, primitive_op: BinaryPrimitiveOp) -> FloatNxN:
     (ii, cl, lhs), (jj, cr, rhs) = basis_iter(basis)
     aij = cl * cr * vmap(primitive_op)(lhs, rhs)
@@ -57,7 +58,7 @@ def integrate_dense(basis: Basis, primitive_op: BinaryPrimitiveOp) -> FloatNxN:
     return out
 
 
-@partial(jit, static_argnums=(0, 1))
+@partial(jit, static_argnums=1)
 def integrate_sparse(basis: Basis, primitive_op: BinaryPrimitiveOp) -> FloatNxN:
     offset = [0] + [o.num_primitives for o in basis.orbitals]
     offset = np.cumsum(offset)
@@ -193,7 +194,7 @@ kinetic_primitives = jit(_kinetic_primitives)
 nuclear_primitives = jit(_nuclear_primitives)
 
 
-@partial(jit, static_argnums=0)
+@jit
 def nuclear_basis(basis: Basis):
     def n(atomic_number, position):
         def op(pi, pj):
@@ -294,7 +295,7 @@ def gen_ijkl(n: int):
                     yield idx, jdx, kdx, ldx
 
 
-@partial(jit, static_argnums=0)
+@eqx.filter_jit
 def eri_basis_sparse(b: Basis):
     indices = []
     batch = []

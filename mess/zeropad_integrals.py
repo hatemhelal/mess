@@ -11,7 +11,7 @@ from mess.primitive import Primitive, product
 from mess.types import FloatNxN
 
 
-@partial(jit, static_argnums=0)
+@jit
 def overlap_basis_zeropad(basis: Basis) -> FloatNxN:
     def op(a, b):
         return _overlap_primitives_zeropad(a, b, basis.max_L)
