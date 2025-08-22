@@ -33,7 +33,7 @@ def eri_pyscf(basis: Basis) -> FloatNxNxNxN:
     def func(basis: Basis) -> FloatNxNxNxN:
         mol = to_pyscf(basis.structure, basis.basis_name)
         kind = "sph" if basis.spherical else "cart"
-        return jnp.array(mol.intor(f"int2e_{kind}", aosim="s1"), dtype=default_fptype())
+        return jnp.array(mol.intor(f"int2e_{kind}", aosym="s1"), dtype=default_fptype())
 
     out_spec = jax.ShapeDtypeStruct(
         shape=4 * (basis.num_orbitals,), dtype=default_fptype()
