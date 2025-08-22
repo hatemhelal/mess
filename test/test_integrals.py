@@ -15,6 +15,7 @@ from mess.integrals import (
     overlap_basis,
     overlap_primitives,
 )
+from mess.integrals_pyscf import overlap_pyscf, kinetic_pyscf, nuclear_pyscf, eri_pyscf
 from mess.interop import to_pyscf
 from mess.primitive import Primitive
 from mess.structure import molecule
@@ -36,9 +37,7 @@ def test_overlap():
 def test_water_overlap(basis_name):
     basis = basisset(molecule("water"), basis_name)
     actual_overlap = overlap_basis(basis)
-
-    scfmol = to_pyscf(molecule("water"), basis_name=basis_name)
-    expect_overlap = scfmol.intor("int1e_ovlp_sph")
+    expect_overlap = overlap_pyscf(basis)
     assert_allclose(actual_overlap, expect_overlap, atol=1e-5)
 
 
@@ -62,7 +61,7 @@ def test_water_kinetic(basis_name):
     basis = basisset(molecule("water"), basis_name)
     actual = kinetic_basis(basis)
 
-    expect = to_pyscf(molecule("water"), basis_name=basis_name).intor("int1e_kin_sph")
+    expect = kinetic_pyscf(basis)
     assert_allclose(actual, expect, atol=1e-5)
 
 
@@ -90,7 +89,7 @@ def test_water_nuclear():
     h2o = molecule("water")
     basis = basisset(h2o, basis_name)
     actual = nuclear_basis(basis).sum(axis=0)
-    expect = to_pyscf(h2o, basis_name=basis_name).intor("int1e_nuc_sph")
+    expect = nuclear_pyscf(basis)
     assert_allclose(actual, expect, atol=1e-3)
 
 
@@ -126,6 +125,8 @@ def test_water_eri(sparse):
     h2o = molecule("water")
     basis = basisset(h2o, basis_name)
     actual = eri_basis_sparse(basis) if sparse else eri_basis(basis)
-    aosym = "s8" if sparse else "s1"
-    expect = to_pyscf(h2o, basis_name=basis_name).intor("int2e_cart", aosym=aosym)
+    if sparse:
+        expect = to_pyscf(h2o, basis_name=basis_name).intor("int2e_cart", aosym="s8")
+    else:
+        expect = eri_pyscf(basis)
     assert_allclose(actual, expect, atol=1e-4)

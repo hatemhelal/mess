@@ -15,23 +15,17 @@ from mess.units import to_bohr
 class Structure(eqx.Module):
     atomic_number: IntN
     position: FloatNx3
+    atomic_symbol: List[str] = eqx.field(static=True)
+    num_electrons: int = eqx.field(static=True)
+    num_atoms: int = eqx.field(static=True)
 
-    def __post_init__(self):
+    def __init__(self, atomic_number: IntN, position: FloatNx3):
         # single atom case
-        self.atomic_number = np.atleast_1d(self.atomic_number)
-        self.position = np.atleast_2d(self.position)
-
-    @property
-    def num_atoms(self) -> int:
-        return len(self.atomic_number)
-
-    @property
-    def atomic_symbol(self) -> List[str]:
-        return [elements[z].symbol for z in self.atomic_number]
-
-    @property
-    def num_electrons(self) -> int:
-        return np.sum(self.atomic_number)
+        self.atomic_number = np.atleast_1d(atomic_number)
+        self.position = np.atleast_2d(position)
+        self.atomic_symbol = [elements[z].symbol for z in self.atomic_number]
+        self.num_electrons = int(np.sum(self.atomic_number))
+        self.num_atoms = len(self.atomic_number)
 
     def _repr_html_(self):
         import py3Dmol
