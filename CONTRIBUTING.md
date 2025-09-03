@@ -15,7 +15,7 @@ The following assumes that you have already set up an install of [uv](https://do
    uv sync --extra dev
    ```
 
-Adding the additional `--extra gpu` will install JAX configured for GPU execution.
+   Adding the additional `--extra gpu` will install JAX configured for GPU execution.
 
 1. Install the pre-commit hooks
 
