@@ -1,7 +1,9 @@
-MIT License
+# MIT License
 
 Copyright (c) 2024 Graphcore Research
+
 Copyright (c) 2024-2025 Valence Labs
+
 Copyright (c) 2025 MESS Authors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
