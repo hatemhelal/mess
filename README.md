@@ -36,7 +36,7 @@ E
 ## License
 
 The reader is encouraged to fork, edit, remix, and use the contents however they find
-most useful. All content is covered by the permissve [MIT License](./LICENSE) to
+most useful. All content is covered by the permissve [MIT License](./LICENSE.md) to
 encourage this. Our aim is to encourage a truly interdisciplinary approach to accelerate
 our understanding of molecular scale processes.
 
